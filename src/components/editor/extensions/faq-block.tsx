@@ -76,10 +76,16 @@ export const FaqBlock = Node.create({
   },
 
   renderHTML({ HTMLAttributes, node }) {
+    const items = (node.attrs.items as FaqItem[]).filter((item) => item.question && item.answer);
     return [
       "div",
       mergeAttributes(HTMLAttributes, { "data-node": "faq-block" }),
-      JSON.stringify(node.attrs.items),
+      ...items.map((item) => [
+        "div",
+        { class: "faq-item", "data-question": item.question },
+        ["p", { class: "faq-question" }, item.question],
+        ["p", { class: "faq-answer" }, item.answer],
+      ]),
     ];
   },
 

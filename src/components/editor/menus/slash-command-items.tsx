@@ -25,6 +25,7 @@ import {
   SigmaIcon,
   PilcrowIcon,
   TableOfContentsIcon,
+  ScaleIcon,
 } from "lucide-react";
 
 export type SlashCommandItem = {
@@ -263,6 +264,14 @@ const ALL_ITEMS: SlashCommandItem[] = [
     keywords: ["katex", "latex", "equation"],
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).insertContent({ type: "mathBlock" }).run(),
+  },
+  {
+    title: "Pros & Cons",
+    description: "Side-by-side comparison list",
+    icon: ScaleIcon,
+    keywords: ["comparison", "vs"],
+    command: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).insertContent({ type: "prosConsBlock" }).run(),
   },
   {
     title: "Table of Contents",

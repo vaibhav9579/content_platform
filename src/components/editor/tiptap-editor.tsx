@@ -30,6 +30,7 @@ import { GithubEmbed } from "@/components/editor/extensions/github-embed";
 import { MermaidBlock } from "@/components/editor/extensions/mermaid-block";
 import { MathBlock } from "@/components/editor/extensions/math-block";
 import { TocBlock } from "@/components/editor/extensions/toc-block";
+import { ProsConsBlock } from "@/components/editor/extensions/pros-cons-block";
 
 export type TiptapEditorHandle = {
   getHTML: () => string;
@@ -102,6 +103,7 @@ export const TiptapEditor = React.forwardRef<
       MermaidBlock,
       MathBlock,
       TocBlock,
+      ProsConsBlock,
       SlashCommand,
     ],
     editorProps: {
