@@ -17,7 +17,7 @@ export const revalidate = 1800;
 export async function generateMetadata({ params }: PageProps<"/category/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
-  if (!category) return {};
+  if (!category) return { robots: { index: false, follow: false } };
   return {
     title: category.metaTitle || category.name,
     description: category.metaDescription || category.description || `Articles in ${category.name}`,

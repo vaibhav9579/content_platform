@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "img.clerk.com" },
       { protocol: "https", hostname: "images.clerk.dev" },
       { protocol: "https", hostname: "i.ytimg.com" },
+      // Demo/seed content only — real deployments serve all imagery through
+      // Cloudinary; remove these once seed data is replaced with real uploads.
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "i.pravatar.cc" },
     ],
   },
 

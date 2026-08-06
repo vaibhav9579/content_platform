@@ -13,7 +13,7 @@ export const revalidate = 1800;
 export async function generateMetadata({ params }: PageProps<"/tag/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const tag = await getTagBySlug(slug);
-  if (!tag) return {};
+  if (!tag) return { robots: { index: false, follow: false } };
   return {
     title: `#${tag.name}`,
     description: tag.description || `Articles tagged with ${tag.name}`,

@@ -15,7 +15,7 @@ export const revalidate = 1800;
 export async function generateMetadata({ params }: PageProps<"/author/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const author = await getPublicAuthorBySlug(slug);
-  if (!author) return {};
+  if (!author) return { robots: { index: false, follow: false } };
   return {
     title: author.name,
     description: author.bio || `Articles by ${author.name}`,

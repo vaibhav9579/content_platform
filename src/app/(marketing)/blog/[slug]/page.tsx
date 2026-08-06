@@ -37,7 +37,9 @@ export async function generateMetadata({
 }: PageProps<"/blog/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPostBySlug(slug, { includeDraft: true });
-  if (!post) return {};
+  // Match the `noindex` tag Next.js injects for the notFound() boundary below,
+  // so search engines never see conflicting robots directives on a 404.
+  if (!post) return { robots: { index: false, follow: false } };
 
   const title = post.metaTitle || post.title;
   const description = post.metaDescription || post.excerpt || siteConfig.description;
