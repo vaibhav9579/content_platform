@@ -1,0 +1,420 @@
+// ============================================================================
+// Enterprise Blog Publishing Platform — Prisma Schema
+// PostgreSQL. Designed for SEO/GEO-optimized, multi-author publishing at scale.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+enum Role {
+  ADMIN
+  EDITOR
+  AUTHOR
+  CONTRIBUTOR
+  SUBSCRIBER
+}
+
+enum PostStatus {
+  DRAFT
+  IN_REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum DifficultyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  SPAM
+  REJECTED
+}
+
+enum ReactionType {
+  LIKE
+  CLAP
+  LOVE
+  INSIGHTFUL
+  CELEBRATE
+}
+
+enum SubscriberStatus {
+  PENDING
+  ACTIVE
+  UNSUBSCRIBED
+  BOUNCED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  AUDIO
+}
+
+// ----------------------------------------------------------------------------
+// Users & Authors
+// ----------------------------------------------------------------------------
+
+/// Mirrors Clerk users. clerkId is the source of truth for auth.
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  imageUrl  String?
+  role      Role     @default(SUBSCRIBER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author    Author?
+  comments  Comment[]
+  bookmarks Bookmark[]
+  reactions Reaction[]
+  revisions PostRevision[]
+  auditLogs AuditLog[]
+
+  @@index([role])
+  @@map("users")
+}
+
+/// Public-facing author/writer profile. One-to-one with User for staff,
+/// but can also exist standalone for guest/legacy authors.
+model Author {
+  id     String  @id @default(cuid())
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  name       String
+  slug       String  @unique
+  bio        String? @db.Text
+  avatarUrl  String?
+  coverUrl   String?
+  title      String? // e.g. "Senior Editor"
+  experience String? @db.Text
+  location   String?
+
+  websiteUrl  String?
+  twitterUrl  String?
+  linkedinUrl String?
+  githubUrl   String?
+  youtubeUrl  String?
+
+  isVerified Boolean @default(false)
+  featured   Boolean @default(false)
+
+  posts     Post[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("authors")
+}
+
+// ----------------------------------------------------------------------------
+// Taxonomy: Categories (nested) & Tags
+// ----------------------------------------------------------------------------
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+  iconName    String?
+  color       String?
+  coverUrl    String?
+
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+
+  metaTitle       String?
+  metaDescription String?
+
+  posts     Post[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Tag {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+
+  posts     Post[]
+  createdAt DateTime @default(now())
+
+  @@map("tags")
+}
+
+// ----------------------------------------------------------------------------
+// Posts (core content entity)
+// ----------------------------------------------------------------------------
+
+model Post {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  title    String
+  subtitle String?
+
+  // Content
+  contentJson Json? // Tiptap JSON document (source of truth for the editor)
+  contentHtml String? @db.Text // Rendered HTML cache for fast reads
+  contentMdx  String? @db.Text // Markdown export cache
+
+  excerpt         String? @db.Text
+  metaTitle       String?
+  metaDescription String? @db.Text
+  canonicalUrl    String?
+  metaRobots      String  @default("index, follow")
+
+  coverImageUrl String?
+  coverImageAlt String?
+  ogImageUrl    String?
+  galleryUrls   String[] @default([])
+
+  status       PostStatus @default(DRAFT)
+  publishedAt  DateTime?
+  scheduledAt  DateTime?
+  updatedAtCms DateTime   @updatedAt
+  createdAt    DateTime   @default(now())
+
+  // GEO / reading-experience metadata
+  readingTimeMinutes Int?
+  wordCount          Int?
+  difficulty         DifficultyLevel? @default(BEGINNER)
+  summary            String?          @db.Text // AI/GEO short answer summary
+  keyTakeaways       String[]         @default([])
+  faq                Json? // [{ question, answer }]
+  sources            Json? // [{ label, url }]
+
+  isFeatured    Boolean @default(false)
+  isPinned      Boolean @default(false)
+  allowComments Boolean @default(true)
+
+  // Relations
+  authorId String
+  author   Author @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  tags Tag[]
+
+  comments  Comment[]
+  views     View[]
+  bookmarks Bookmark[]
+  reactions Reaction[]
+  revisions PostRevision[]
+
+  relatedFrom PostRelation[] @relation("RelatedFrom")
+  relatedTo   PostRelation[] @relation("RelatedTo")
+
+  viewCount     Int @default(0)
+  shareCount    Int @default(0)
+  likeCount     Int @default(0)
+  clapCount     Int @default(0)
+  bookmarkCount Int @default(0)
+
+  @@index([status, publishedAt])
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([isFeatured])
+  @@map("posts")
+}
+
+/// Explicit curated related-post links (in addition to algorithmic relatedness).
+model PostRelation {
+  id            String @id @default(cuid())
+  postId        String
+  post          Post   @relation("RelatedFrom", fields: [postId], references: [id], onDelete: Cascade)
+  relatedPostId String
+  relatedPost   Post   @relation("RelatedTo", fields: [relatedPostId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, relatedPostId])
+  @@map("post_relations")
+}
+
+/// Full snapshot history for revision history / undo-redo across sessions.
+model PostRevision {
+  id       String  @id @default(cuid())
+  postId   String
+  post     Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId String?
+  editor   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  title           String
+  contentJson     Json
+  summaryOfChange String?
+  createdAt       DateTime @default(now())
+
+  @@index([postId, createdAt])
+  @@map("post_revisions")
+}
+
+// ----------------------------------------------------------------------------
+// Engagement: Comments, Reactions, Bookmarks, Views
+// ----------------------------------------------------------------------------
+
+model Comment {
+  id     String  @id @default(cuid())
+  postId String
+  post   Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  guestName  String?
+  guestEmail String?
+
+  body   String        @db.Text
+  status CommentStatus @default(PENDING)
+
+  parentId String?
+  parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[] @relation("CommentThread")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postId, status])
+  @@map("comments")
+}
+
+model Reaction {
+  id     String       @id @default(cuid())
+  postId String
+  post   Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type   ReactionType
+
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId, type])
+  @@map("reactions")
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@map("bookmarks")
+}
+
+/// Individual page-view events (append-only). Aggregated onto Post.viewCount.
+model View {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  visitorId String // anonymous fingerprint / cookie id
+  referrer  String?
+  userAgent String?
+  country   String?
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+  @@map("views")
+}
+
+// ----------------------------------------------------------------------------
+// Newsletter
+// ----------------------------------------------------------------------------
+
+model NewsletterSubscriber {
+  id             String           @id @default(cuid())
+  email          String           @unique
+  status         SubscriberStatus @default(PENDING)
+  source         String?
+  confirmedAt    DateTime?
+  unsubscribedAt DateTime?
+  createdAt      DateTime         @default(now())
+
+  @@map("newsletter_subscribers")
+}
+
+// ----------------------------------------------------------------------------
+// Media Library
+// ----------------------------------------------------------------------------
+
+model Media {
+  id           String    @id @default(cuid())
+  publicId     String    @unique // Cloudinary public id
+  url          String
+  secureUrl    String
+  type         MediaType @default(IMAGE)
+  format       String?
+  width        Int?
+  height       Int?
+  bytes        Int?
+  altText      String?
+  caption      String?
+  folder       String?
+  uploadedById String?
+
+  createdAt DateTime @default(now())
+
+  @@map("media")
+}
+
+// ----------------------------------------------------------------------------
+// Analytics & Audit
+// ----------------------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+/// Site-wide singleton configuration editable from the Admin Settings screen.
+model SiteSettings {
+  id                  String  @id @default("singleton")
+  siteName            String  @default("The Publication")
+  siteDescription     String  @default("An enterprise-grade publishing platform.")
+  siteUrl             String  @default("https://example.com")
+  logoUrl             String?
+  faviconUrl          String?
+  defaultOgImageUrl   String?
+  twitterHandle       String?
+  organizationName    String?
+  organizationLogoUrl String?
+  contactEmail        String?
+
+  googleSiteVerification String?
+  bingSiteVerification   String?
+
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
+}
