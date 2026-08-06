@@ -94,3 +94,4 @@ export const commentRateLimit = createRateLimiter("comment", 5, "1 m");
 export const newsletterRateLimit = createRateLimiter("newsletter", 3, "1 h");
 export const uploadRateLimit = createRateLimiter("upload", 30, "1 h");
 export const searchRateLimit = createRateLimiter("search", 60, "1 m");
+export const viewsRateLimit = createRateLimiter("views", 120, "1 m");

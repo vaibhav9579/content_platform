@@ -1,15 +1,21 @@
 "use client";
 
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 
-export function ViewsChart({ data }: { data: { date: string; views: number }[] }) {
+type TrafficPoint = { date: string; pageViews: number; uniqueVisitors: number };
+
+export function TrafficChart({ data }: { data: TrafficPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
         <defs>
-          <linearGradient id="viewsGradient" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="pageViewsGradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--color-chart-2)" stopOpacity={0.35} />
             <stop offset="100%" stopColor="var(--color-chart-2)" stopOpacity={0} />
+          </linearGradient>
+          <linearGradient id="visitorsGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.35} />
+            <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0} />
           </linearGradient>
         </defs>
         <XAxis
@@ -29,12 +35,23 @@ export function ViewsChart({ data }: { data: { date: string; views: number }[] }
             fontSize: 12,
           }}
         />
+        <Legend
+          wrapperStyle={{ fontSize: 12 }}
+          formatter={(value) => (value === "pageViews" ? "Page views" : "Unique visitors")}
+        />
         <Area
           type="monotone"
-          dataKey="views"
+          dataKey="pageViews"
           stroke="var(--color-chart-2)"
           strokeWidth={2}
-          fill="url(#viewsGradient)"
+          fill="url(#pageViewsGradient)"
+        />
+        <Area
+          type="monotone"
+          dataKey="uniqueVisitors"
+          stroke="var(--color-chart-1)"
+          strokeWidth={2}
+          fill="url(#visitorsGradient)"
         />
       </AreaChart>
     </ResponsiveContainer>

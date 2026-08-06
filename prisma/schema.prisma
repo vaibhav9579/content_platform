@@ -335,18 +335,24 @@ model Bookmark {
   @@map("bookmarks")
 }
 
-/// Individual page-view events (append-only). Aggregated onto Post.viewCount.
+/// Individual page-view events (append-only), for every page on the site —
+/// not just posts. Human, non-duplicate post views are also aggregated onto
+/// Post.viewCount for fast per-post sorting.
 model View {
   id        String   @id @default(cuid())
-  postId    String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  visitorId String // anonymous fingerprint / cookie id
+  path      String // pathname, e.g. "/", "/blog/my-post", "/category/tech"
+  postId    String?
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  visitorId String // durable id from an httpOnly first-party cookie
+  isBot     Boolean  @default(false) // known crawler/script UA — excluded from human-facing stats
   referrer  String?
   userAgent String?
   country   String?
   createdAt DateTime @default(now())
 
   @@index([postId, createdAt])
+  @@index([visitorId, path, createdAt])
+  @@index([isBot, createdAt])
   @@map("views")
 }
 

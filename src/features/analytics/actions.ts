@@ -4,21 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/auth";
 import { PostStatus, type Prisma } from "@prisma/client";
 
-export async function recordView(postId: string, visitorId: string, referrer?: string, userAgent?: string) {
-  const since = new Date(Date.now() - 30 * 60 * 1000); // 30-minute dedupe window per visitor
-  const recent = await prisma.view.findFirst({
-    where: { postId, visitorId, createdAt: { gte: since } },
-    select: { id: true },
-  });
-  if (recent) return { counted: false };
-
-  await prisma.$transaction([
-    prisma.view.create({ data: { postId, visitorId, referrer, userAgent } }),
-    prisma.post.update({ where: { id: postId }, data: { viewCount: { increment: 1 } } }),
-  ]);
-  return { counted: true };
-}
-
 export async function recordShare(postId: string) {
   await prisma.post.update({ where: { id: postId }, data: { shareCount: { increment: 1 } } });
   return { success: true };
@@ -47,20 +32,35 @@ export async function getDashboardStats() {
     ]);
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const recentViews = await prisma.view.findMany({
-    where: { createdAt: { gte: thirtyDaysAgo } },
-    select: { createdAt: true },
-  });
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const viewsByDay = new Map<string, number>();
+  const [recentViews, last24hViews] = await Promise.all([
+    // Excludes bot traffic — these are the numbers shown to humans, not
+    // crawler-activity logs (those stay queryable in the `views` table
+    // directly via isBot=true for anyone auditing SEO crawl coverage).
+    prisma.view.findMany({
+      where: { createdAt: { gte: thirtyDaysAgo }, isBot: false },
+      select: { createdAt: true, visitorId: true },
+    }),
+    prisma.view.findMany({
+      where: { createdAt: { gte: oneDayAgo }, isBot: false },
+      select: { visitorId: true },
+    }),
+  ]);
+
+  const byDay = new Map<string, { pageViews: number; visitors: Set<string> }>();
   for (const v of recentViews) {
     const day = v.createdAt.toISOString().slice(0, 10);
-    viewsByDay.set(day, (viewsByDay.get(day) ?? 0) + 1);
+    const bucket = byDay.get(day) ?? { pageViews: 0, visitors: new Set<string>() };
+    bucket.pageViews += 1;
+    bucket.visitors.add(v.visitorId);
+    byDay.set(day, bucket);
   }
-  const viewsTimeline = Array.from({ length: 30 }, (_, i) => {
+  const trafficTimeline = Array.from({ length: 30 }, (_, i) => {
     const date = new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000);
     const key = date.toISOString().slice(0, 10);
-    return { date: key, views: viewsByDay.get(key) ?? 0 };
+    const bucket = byDay.get(key);
+    return { date: key, pageViews: bucket?.pageViews ?? 0, uniqueVisitors: bucket?.visitors.size ?? 0 };
   });
 
   return {
@@ -73,7 +73,10 @@ export async function getDashboardStats() {
     pendingComments,
     subscribers,
     topPosts,
-    viewsTimeline,
+    trafficTimeline,
+    pageViews30d: recentViews.length,
+    uniqueVisitors30d: new Set(recentViews.map((v) => v.visitorId)).size,
+    uniqueVisitors24h: new Set(last24hViews.map((v) => v.visitorId)).size,
   };
 }
 
@@ -110,7 +113,7 @@ export async function getReferrerBreakdown() {
 
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const views = await prisma.view.findMany({
-    where: { createdAt: { gte: since } },
+    where: { createdAt: { gte: since }, isBot: false },
     select: { referrer: true },
   });
 

@@ -1,17 +1,26 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { FileTextIcon, EyeIcon, MessageSquareIcon, MailIcon, ClockIcon, CalendarClockIcon } from "lucide-react";
+import {
+  FileTextIcon,
+  EyeIcon,
+  MessageSquareIcon,
+  MailIcon,
+  ClockIcon,
+  CalendarClockIcon,
+  UsersIcon,
+} from "lucide-react";
 
 import { getDashboardStats } from "@/features/analytics/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ViewsChart } from "@/components/admin/views-chart";
+import { TrafficChart } from "@/components/admin/traffic-chart";
 import { formatCompactNumber } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 const statCards = [
-  { key: "totalViews", label: "Total Views", icon: EyeIcon },
+  { key: "totalViews", label: "Total Post Views", icon: EyeIcon },
+  { key: "uniqueVisitors30d", label: "Unique Visitors (30d)", icon: UsersIcon },
   { key: "published", label: "Published Posts", icon: FileTextIcon },
   { key: "pendingComments", label: "Pending Comments", icon: MessageSquareIcon },
   { key: "subscribers", label: "Subscribers", icon: MailIcon },
@@ -28,7 +37,7 @@ export default async function AdminDashboardPage() {
         <p className="text-muted-foreground text-sm">An overview of your publication&apos;s performance.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         {statCards.map((card) => (
           <Card key={card.key}>
             <CardContent className="flex items-center justify-between pt-5 pb-5">
@@ -46,11 +55,15 @@ export default async function AdminDashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Views — Last 30 Days</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle>Traffic — Last 30 Days</CardTitle>
+            <p className="text-muted-foreground text-xs">
+              {formatCompactNumber(stats.uniqueVisitors24h)} unique visitor
+              {stats.uniqueVisitors24h === 1 ? "" : "s"} in the last 24h
+            </p>
           </CardHeader>
           <CardContent>
-            <ViewsChart data={stats.viewsTimeline} />
+            <TrafficChart data={stats.trafficTimeline} />
           </CardContent>
         </Card>
 

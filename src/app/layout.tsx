@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { SiteViewTracker } from "@/components/shared/site-view-tracker";
 import { siteConfig } from "@/config/site";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo/schema";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -107,6 +108,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </a>
             {children}
             <Toaster position="bottom-right" richColors closeButton />
+            <SiteViewTracker />
           </ThemeProvider>
           <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />
         </body>
