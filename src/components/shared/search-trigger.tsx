@@ -42,6 +42,9 @@ export function SearchTrigger() {
 
   React.useEffect(() => {
     if (query.trim().length < 2) {
+      // Resetting to empty when the query is cleared is part of syncing
+      // with the debounced fetch below, not derivable at render time.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults(EMPTY);
       return;
     }

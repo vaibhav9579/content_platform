@@ -18,7 +18,6 @@ export function SearchBox({ initialQuery }: { initialQuery: string }) {
       else params.delete("q");
       params.delete("page");
       router.push(`/search?${params.toString()}`);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, 350);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps

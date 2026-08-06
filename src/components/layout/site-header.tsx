@@ -7,7 +7,7 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { SearchTrigger } from "@/components/shared/search-trigger";
 import { isStaffRole } from "@/lib/auth";
 import { getCurrentDbUser } from "@/lib/auth";
-import { LayoutDashboardIcon } from "lucide-react";
+import { LayoutDashboardIcon, BookmarkIcon } from "lucide-react";
 
 export async function SiteHeader() {
   const user = await getCurrentDbUser().catch(() => null);
@@ -40,6 +40,13 @@ export async function SiteHeader() {
             <Button variant="ghost" size="icon" asChild aria-label="Admin dashboard">
               <Link href="/admin/dashboard">
                 <LayoutDashboardIcon className="size-4" />
+              </Link>
+            </Button>
+          )}
+          {user && (
+            <Button variant="ghost" size="icon" asChild aria-label="My bookmarks">
+              <Link href="/bookmarks">
+                <BookmarkIcon className="size-4" />
               </Link>
             </Button>
           )}

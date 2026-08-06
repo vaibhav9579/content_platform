@@ -10,6 +10,10 @@ export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
+  // Deliberate one-time re-render to bridge the SSR/CSR theme mismatch —
+  // `resolvedTheme` is unknown on the server, so we render a neutral icon
+  // until mounted, then flip to the real theme.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   React.useEffect(() => setMounted(true), []);
 
   return (

@@ -30,7 +30,6 @@ function VideoEmbedView({ node, updateAttributes }: NodeViewProps) {
 
   return (
     <NodeViewWrapper className="not-prose my-4" data-type="video">
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <video src={src} controls preload="metadata" className="w-full rounded-xl" />
     </NodeViewWrapper>
   );

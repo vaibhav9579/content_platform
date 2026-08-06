@@ -26,7 +26,6 @@ export function sanitizeArticleHtml(html: string) {
 export function ArticleContent({ html, id }: { html: string; id: string }) {
   const clean = sanitizeArticleHtml(html);
   return (
-    // eslint-disable-next-line react/no-danger
     <div id={id} className="prose-article" dangerouslySetInnerHTML={{ __html: clean }} />
   );
 }

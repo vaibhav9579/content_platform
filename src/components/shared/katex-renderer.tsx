@@ -13,6 +13,5 @@ export function KatexRenderer({ formula, block = false }: { formula: string; blo
     }
   }, [formula, block]);
 
-  // eslint-disable-next-line react/no-danger
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
 }

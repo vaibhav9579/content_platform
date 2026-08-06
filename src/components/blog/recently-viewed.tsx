@@ -5,17 +5,25 @@ import Link from "next/link";
 
 type Item = { slug: string; title: string; viewedAt: number };
 
+function readRecentlyViewed(excludeSlug: string): Item[] {
+  try {
+    const raw = localStorage.getItem("cp_recently_viewed");
+    const list: Item[] = raw ? JSON.parse(raw) : [];
+    return list.filter((i) => i.slug !== excludeSlug).slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
 export function RecentlyViewed({ excludeSlug }: { excludeSlug: string }) {
   const [items, setItems] = React.useState<Item[]>([]);
 
   React.useEffect(() => {
-    try {
-      const raw = localStorage.getItem("cp_recently_viewed");
-      const list: Item[] = raw ? JSON.parse(raw) : [];
-      setItems(list.filter((i) => i.slug !== excludeSlug).slice(0, 5));
-    } catch {
-      setItems([]);
-    }
+    // localStorage only exists client-side, so reading it has to happen in
+    // an effect rather than during render — this isn't state we could
+    // derive without syncing from that external source first.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setItems(readRecentlyViewed(excludeSlug));
   }, [excludeSlug]);
 
   if (items.length === 0) return null;

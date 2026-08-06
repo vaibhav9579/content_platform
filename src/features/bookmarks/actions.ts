@@ -5,6 +5,7 @@ import { ReactionType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentDbUser } from "@/lib/auth";
+import { publicSelect } from "@/features/posts/queries/get-posts";
 
 type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
 
@@ -38,18 +39,7 @@ export async function getUserBookmarks() {
   const bookmarks = await prisma.bookmark.findMany({
     where: { userId: user.id },
     include: {
-      post: {
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          coverImageUrl: true,
-          excerpt: true,
-          readingTimeMinutes: true,
-          publishedAt: true,
-          author: { select: { name: true, slug: true } },
-        },
-      },
+      post: { select: publicSelect },
     },
     orderBy: { createdAt: "desc" },
   });
