@@ -20,8 +20,9 @@ export default async function BlogIndexPage({
   const sp = await searchParams;
   const page = Number(sp.page) || 1;
   const sort = (sp.sort as PostListFilter["sort"]) || "newest";
+  const featured = sp.featured === "1" ? true : undefined;
 
-  const { posts, total, totalPages } = await getPosts({ sort, page });
+  const { posts, total, totalPages } = await getPosts({ sort, page, featured });
 
   return (
     <div className="container-wide py-12">
