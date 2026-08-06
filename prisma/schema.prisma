@@ -196,6 +196,7 @@ model Post {
   scheduledAt  DateTime?
   updatedAtCms DateTime   @updatedAt
   createdAt    DateTime   @default(now())
+  deletedAt    DateTime? // soft delete — set instead of removing the row; see features/posts/actions/trash-actions.ts
 
   // GEO / reading-experience metadata
   readingTimeMinutes Int?
@@ -238,6 +239,7 @@ model Post {
   @@index([authorId])
   @@index([categoryId])
   @@index([isFeatured])
+  @@index([deletedAt])
   @@map("posts")
 }
 
@@ -291,10 +293,12 @@ model Comment {
   parent   Comment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: Cascade)
   replies  Comment[] @relation("CommentThread")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft delete
 
   @@index([postId, status])
+  @@index([deletedAt])
   @@map("comments")
 }
 
@@ -374,8 +378,10 @@ model Media {
   folder       String?
   uploadedById String?
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  deletedAt DateTime? // soft delete — Cloudinary asset stays put until permanent delete
 
+  @@index([deletedAt])
   @@map("media")
 }
 

@@ -22,7 +22,7 @@ export async function GET() {
   const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
   const posts = await prisma.post.findMany({
-    where: { status: PostStatus.PUBLISHED, publishedAt: { gte: since } },
+    where: { status: PostStatus.PUBLISHED, deletedAt: null, publishedAt: { gte: since } },
     orderBy: { publishedAt: "desc" },
     include: { category: true },
   });

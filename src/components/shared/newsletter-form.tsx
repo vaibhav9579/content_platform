@@ -7,18 +7,20 @@ import { MailIcon } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { HoneypotField } from "@/components/shared/honeypot-field";
 import { subscribeToNewsletter } from "@/features/newsletter/actions";
 import { cn } from "@/lib/utils";
 
 export function NewsletterForm({ source, className }: { source: string; className?: string }) {
   const [email, setEmail] = React.useState("");
+  const [website, setWebsite] = React.useState("");
   const [pending, startTransition] = useTransition();
   const [done, setDone] = React.useState(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      const result = await subscribeToNewsletter({ email, source });
+      const result = await subscribeToNewsletter({ email, source, website });
       if (result.success) {
         setDone(true);
         toast.success("You're subscribed! Check your inbox.");
@@ -35,6 +37,7 @@ export function NewsletterForm({ source, className }: { source: string; classNam
 
   return (
     <form onSubmit={handleSubmit} className={cn("flex w-full max-w-xs gap-2", className)}>
+      <HoneypotField value={website} onChange={setWebsite} />
       <div className="relative flex-1">
         <MailIcon className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
         <Input

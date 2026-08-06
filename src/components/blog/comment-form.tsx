@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { HoneypotField } from "@/components/shared/honeypot-field";
 import { submitComment } from "@/features/comments/actions";
 
 export function CommentForm({
@@ -23,12 +24,13 @@ export function CommentForm({
   const [body, setBody] = React.useState("");
   const [guestName, setGuestName] = React.useState("");
   const [guestEmail, setGuestEmail] = React.useState("");
+  const [website, setWebsite] = React.useState("");
   const [pending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      const result = await submitComment({ postId, parentId, body, guestName, guestEmail });
+      const result = await submitComment({ postId, parentId, body, guestName, guestEmail, website });
       if (result.success) {
         toast.success(isSignedIn ? "Comment posted" : "Comment submitted for review");
         setBody("");
@@ -41,6 +43,7 @@ export function CommentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      <HoneypotField value={website} onChange={setWebsite} />
       {!isSignedIn && (
         <div className="grid gap-3 sm:grid-cols-2">
           <Input placeholder="Name" required value={guestName} onChange={(e) => setGuestName(e.target.value)} />

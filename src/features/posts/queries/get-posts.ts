@@ -73,6 +73,7 @@ export async function getPosts(filter: PostListFilter = {}) {
   } = filter;
 
   const where: Prisma.PostWhereInput = {
+    deletedAt: null,
     status: Array.isArray(status) ? { in: status } : status,
     ...(categorySlug ? { category: { slug: categorySlug } } : {}),
     ...(tagSlug ? { tags: { some: { slug: tagSlug } } } : {}),
@@ -107,6 +108,7 @@ export async function getPostBySlug(slug: string, opts: { includeDraft?: boolean
   return prisma.post.findFirst({
     where: {
       slug,
+      deletedAt: null,
       ...(opts.includeDraft ? {} : { status: PostStatus.PUBLISHED }),
     },
     include: {
@@ -133,6 +135,7 @@ export async function getRelatedPosts(post: {
   const algorithmic = await prisma.post.findMany({
     where: {
       id: { not: post.id },
+      deletedAt: null,
       status: PostStatus.PUBLISHED,
       OR: [
         ...(post.categoryId ? [{ categoryId: post.categoryId }] : []),
@@ -152,12 +155,22 @@ export async function getAdjacentPosts(publishedAt: Date | null, currentId: stri
   if (!publishedAt) return { previous: null, next: null };
   const [previous, next] = await Promise.all([
     prisma.post.findFirst({
-      where: { status: PostStatus.PUBLISHED, publishedAt: { lt: publishedAt }, id: { not: currentId } },
+      where: {
+        status: PostStatus.PUBLISHED,
+        deletedAt: null,
+        publishedAt: { lt: publishedAt },
+        id: { not: currentId },
+      },
       orderBy: { publishedAt: "desc" },
       select: { slug: true, title: true, coverImageUrl: true },
     }),
     prisma.post.findFirst({
-      where: { status: PostStatus.PUBLISHED, publishedAt: { gt: publishedAt }, id: { not: currentId } },
+      where: {
+        status: PostStatus.PUBLISHED,
+        deletedAt: null,
+        publishedAt: { gt: publishedAt },
+        id: { not: currentId },
+      },
       orderBy: { publishedAt: "asc" },
       select: { slug: true, title: true, coverImageUrl: true },
     }),

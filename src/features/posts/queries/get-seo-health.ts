@@ -17,7 +17,7 @@ export type SeoIssue =
 
 export async function getSeoHealthReport() {
   const posts = await prisma.post.findMany({
-    where: { status: PostStatus.PUBLISHED },
+    where: { status: PostStatus.PUBLISHED, deletedAt: null },
     select: {
       id: true,
       slug: true,

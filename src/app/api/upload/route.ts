@@ -4,6 +4,7 @@ import { requireStaff } from "@/lib/auth";
 import { cloudinary } from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 import { MediaType } from "@prisma/client";
+import { uploadRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,11 @@ export async function POST(req: Request) {
   const user = await requireStaff();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { success: withinLimit } = await uploadRateLimit.check(user.id);
+  if (!withinLimit) {
+    return NextResponse.json({ error: "Too many uploads — please slow down." }, { status: 429 });
   }
 
   const formData = await req.formData();

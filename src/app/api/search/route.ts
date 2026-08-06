@@ -2,8 +2,15 @@ import { NextResponse } from "next/server";
 import { PostStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { searchRateLimit, getRequestIdentifier } from "@/lib/rate-limit";
 
 export async function GET(req: Request) {
+  const identifier = await getRequestIdentifier();
+  const { success: withinLimit } = await searchRateLimit.check(identifier);
+  if (!withinLimit) {
+    return NextResponse.json({ error: "Too many searches — please slow down." }, { status: 429 });
+  }
+
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q")?.trim() ?? "";
 

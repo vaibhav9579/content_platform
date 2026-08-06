@@ -10,7 +10,7 @@ export const contentType = "image/png";
 export default async function OpengraphImage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = await prisma.post.findUnique({
-    where: { slug },
+    where: { slug, deletedAt: null },
     select: { title: true, category: { select: { name: true } }, author: { select: { name: true } } },
   });
 

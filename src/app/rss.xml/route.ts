@@ -8,7 +8,7 @@ export const revalidate = 3600;
 
 export async function GET() {
   const posts = await prisma.post.findMany({
-    where: { status: PostStatus.PUBLISHED },
+    where: { status: PostStatus.PUBLISHED, deletedAt: null },
     orderBy: { publishedAt: "desc" },
     take: 50,
     include: { author: true, category: true },

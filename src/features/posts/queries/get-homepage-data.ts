@@ -11,13 +11,13 @@ export async function getHomepageData() {
     getPosts({ sort: "trending", pageSize: 5 }),
     getPosts({ sort: "newest", pageSize: 9 }),
     prisma.post.findMany({
-      where: { status: PostStatus.PUBLISHED, isPinned: true },
+      where: { status: PostStatus.PUBLISHED, isPinned: true, deletedAt: null },
       orderBy: { publishedAt: "desc" },
       take: 4,
       select: publicSelect,
     }),
     prisma.category.findMany({
-      where: { posts: { some: { status: PostStatus.PUBLISHED } } },
+      where: { posts: { some: { status: PostStatus.PUBLISHED, deletedAt: null } } },
       orderBy: { posts: { _count: "desc" } },
       take: 6,
       select: { id: true, name: true, slug: true, iconName: true, _count: { select: { posts: true } } },

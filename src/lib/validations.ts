@@ -99,12 +99,18 @@ export const commentInputSchema = z.object({
   parentId: z.string().cuid().optional().nullable(),
   guestName: z.string().max(80).optional(),
   guestEmail: z.string().email().optional(),
+  // Honeypot: a real visitor never sees or fills this field (hidden via
+  // CSS, off-screen, and unlabeled for screen readers). Bots that
+  // autofill every input on a form will populate it, so any non-empty
+  // value here means "reject silently."
+  website: z.string().max(200).optional(),
 });
 export type CommentInput = z.infer<typeof commentInputSchema>;
 
 export const newsletterSubscribeSchema = z.object({
   email: z.string().email("Enter a valid email address"),
   source: z.string().max(60).optional(),
+  website: z.string().max(200).optional(), // honeypot — see commentInputSchema
 });
 export type NewsletterSubscribeInput = z.infer<typeof newsletterSubscribeSchema>;
 

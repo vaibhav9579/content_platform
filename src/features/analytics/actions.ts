@@ -30,16 +30,16 @@ export async function getDashboardStats() {
 
   const [totalPosts, published, drafts, scheduled, totalViews, totalComments, pendingComments, subscribers, topPosts] =
     await Promise.all([
-      prisma.post.count(),
-      prisma.post.count({ where: { status: PostStatus.PUBLISHED } }),
-      prisma.post.count({ where: { status: PostStatus.DRAFT } }),
-      prisma.post.count({ where: { status: PostStatus.SCHEDULED } }),
-      prisma.post.aggregate({ _sum: { viewCount: true } }),
-      prisma.comment.count(),
-      prisma.comment.count({ where: { status: "PENDING" } }),
+      prisma.post.count({ where: { deletedAt: null } }),
+      prisma.post.count({ where: { status: PostStatus.PUBLISHED, deletedAt: null } }),
+      prisma.post.count({ where: { status: PostStatus.DRAFT, deletedAt: null } }),
+      prisma.post.count({ where: { status: PostStatus.SCHEDULED, deletedAt: null } }),
+      prisma.post.aggregate({ where: { deletedAt: null }, _sum: { viewCount: true } }),
+      prisma.comment.count({ where: { deletedAt: null } }),
+      prisma.comment.count({ where: { status: "PENDING", deletedAt: null } }),
       prisma.newsletterSubscriber.count({ where: { status: "ACTIVE" } }),
       prisma.post.findMany({
-        where: { status: PostStatus.PUBLISHED },
+        where: { status: PostStatus.PUBLISHED, deletedAt: null },
         orderBy: { viewCount: "desc" },
         take: 5,
         select: { id: true, title: true, slug: true, viewCount: true, likeCount: true, publishedAt: true },
@@ -86,7 +86,7 @@ export async function getTopPostsBy(sort: AnalyticsSort, take = 10) {
   const orderBy: Prisma.PostOrderByWithRelationInput = { [sort]: "desc" };
 
   return prisma.post.findMany({
-    where: { status: PostStatus.PUBLISHED },
+    where: { status: PostStatus.PUBLISHED, deletedAt: null },
     orderBy,
     take,
     select: {

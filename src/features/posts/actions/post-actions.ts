@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { Prisma, PostStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireStaff, canPublish } from "@/lib/auth";
-import { getAdminPosts } from "@/features/posts/queries/get-admin-posts";
+import { requireStaff, canPublish, canManageSettings } from "@/lib/auth";
+import { getAdminPosts, getTrashedPosts } from "@/features/posts/queries/get-admin-posts";
 import { postInputSchema, type PostInput } from "@/lib/validations";
 import { ensureUniqueSlug } from "@/lib/content/slug";
 import { computeExcerpt, computeMetaDescription, computeReadingStats } from "@/lib/content/reading-time";
@@ -142,6 +142,7 @@ export async function autosavePost(id: string, contentJson: unknown, contentHtml
   }
 }
 
+/** Moves a post to trash — recoverable via `restorePost`. */
 export async function deletePost(id: string): Promise<ActionResult> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
@@ -149,10 +150,48 @@ export async function deletePost(id: string): Promise<ActionResult> {
   const post = await prisma.post.findUnique({ where: { id }, select: { slug: true } });
   if (!post) return { success: false, error: "Post not found" };
 
+  await prisma.$transaction([
+    prisma.post.update({ where: { id }, data: { deletedAt: new Date() } }),
+    // A trashed post shouldn't keep surfacing in "related articles" — drop
+    // both directions of any curated relation involving it.
+    prisma.postRelation.deleteMany({ where: { OR: [{ postId: id }, { relatedPostId: id }] } }),
+  ]);
+
+  revalidatePublicPost(post.slug);
+  revalidatePath("/admin/posts");
+  return { success: true, data: undefined };
+}
+
+export async function restorePost(id: string): Promise<ActionResult<{ slug: string }>> {
+  const user = await requireStaff();
+  if (!user) return { success: false, error: "Unauthorized" };
+
+  const post = await prisma.post.update({ where: { id }, data: { deletedAt: null } });
+  revalidatePublicPost(post.slug);
+  revalidatePath("/admin/posts");
+  return { success: true, data: { slug: post.slug } };
+}
+
+/** Irreversibly deletes a trashed post. Only callable on already-trashed posts, and admin-only. */
+export async function permanentlyDeletePost(id: string): Promise<ActionResult> {
+  const user = await requireStaff();
+  if (!user) return { success: false, error: "Unauthorized" };
+  if (!canManageSettings(user.role)) return { success: false, error: "Only admins can permanently delete posts." };
+
+  const post = await prisma.post.findUnique({ where: { id }, select: { slug: true, deletedAt: true } });
+  if (!post) return { success: false, error: "Post not found" };
+  if (!post.deletedAt) return { success: false, error: "Move the post to trash before deleting it permanently." };
+
   await prisma.post.delete({ where: { id } });
   revalidatePublicPost(post.slug);
   revalidatePath("/admin/posts");
   return { success: true, data: undefined };
+}
+
+export async function listTrashedPostsForAdmin() {
+  const user = await requireStaff();
+  if (!user) return [];
+  return getTrashedPosts();
 }
 
 export async function duplicatePost(id: string): Promise<ActionResult<{ id: string }>> {
