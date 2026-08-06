@@ -1,9 +1,7 @@
-import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { BookmarkIcon } from "lucide-react";
 
 import { getUserBookmarks } from "@/features/bookmarks/actions";
-import { getCurrentDbUser } from "@/lib/auth";
 import { PostCard } from "@/components/blog/post-card";
 
 export const metadata: Metadata = {
@@ -12,9 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default async function BookmarksPage() {
-  const user = await getCurrentDbUser();
-  if (!user) redirect("/sign-in?redirect_url=/bookmarks");
-
+  // Auth is enforced in bookmarks/layout.tsx — reaching this component means
+  // a signed-in user is guaranteed.
   const posts = await getUserBookmarks();
 
   return (
