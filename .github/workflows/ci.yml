@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  # Syntactically valid Clerk dev-instance test keys (not a real account) so
+  # ClerkProvider can initialize during build/SSR. Override with real test
+  # keys via repository secrets for a fuller signed-in E2E run.
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_Y2xlcmsuZXhhbXBsZS5jb20k' }}
+  CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_ci_placeholder_not_a_real_secret' }}
+  CLERK_WEBHOOK_SIGNING_SECRET: ${{ secrets.CLERK_WEBHOOK_SIGNING_SECRET || 'whsec_ci_placeholder' }}
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+  NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+  NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: /
+  NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /
+  CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME || 'demo' }}
+  CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY || '123456789012345' }}
+  CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET || 'ci-placeholder-secret' }}
+  NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME || 'demo' }}
+  NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: content_platform_unsigned
+  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  NEXT_PUBLIC_SITE_NAME: "The Publication"
+  ADMIN_EMAILS: admin@example.com
+  REVALIDATE_SECRET: ci-placeholder-revalidate-secret
+  CRON_SECRET: ci-placeholder-cron-secret
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/content_platform?schema=public
+  DIRECT_URL: postgresql://postgres:postgres@localhost:5432/content_platform?schema=public
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run typecheck
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, unit-tests]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: content_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx prisma migrate deploy
+      - run: npm run build
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    needs: build
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: content_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - run: npx prisma migrate deploy
+      - run: npm run db:seed
+      - run: npm run build
+      - name: Run Playwright tests
+        run: npm run test:e2e
+        env:
+          CI: true
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
