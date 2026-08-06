@@ -17,7 +17,7 @@ export type PostListFilter = {
   pageSize?: number;
 };
 
-const publicSelect = {
+export const publicSelect = {
   id: true,
   slug: true,
   title: true,
