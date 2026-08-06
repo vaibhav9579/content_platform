@@ -76,6 +76,21 @@ export async function deleteComment(id: string): Promise<ActionResult> {
   return { success: true, data: undefined };
 }
 
+export async function getAllComments(status?: CommentStatus) {
+  const user = await requireStaff();
+  if (!user) return [];
+
+  return prisma.comment.findMany({
+    where: status ? { status } : undefined,
+    include: {
+      user: { select: { name: true, email: true, imageUrl: true } },
+      post: { select: { title: true, slug: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+}
+
 export async function getApprovedComments(postId: string) {
   return prisma.comment.findMany({
     where: { postId, status: CommentStatus.APPROVED, parentId: null },

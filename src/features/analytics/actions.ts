@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/auth";
-import { PostStatus } from "@prisma/client";
+import { PostStatus, type Prisma } from "@prisma/client";
 
 export async function recordView(postId: string, visitorId: string, referrer?: string, userAgent?: string) {
   const since = new Date(Date.now() - 30 * 60 * 1000); // 30-minute dedupe window per visitor
@@ -75,4 +75,60 @@ export async function getDashboardStats() {
     topPosts,
     viewsTimeline,
   };
+}
+
+export type AnalyticsSort = "viewCount" | "likeCount" | "clapCount" | "shareCount" | "bookmarkCount";
+
+export async function getTopPostsBy(sort: AnalyticsSort, take = 10) {
+  const user = await requireStaff();
+  if (!user) return [];
+
+  const orderBy: Prisma.PostOrderByWithRelationInput = { [sort]: "desc" };
+
+  return prisma.post.findMany({
+    where: { status: PostStatus.PUBLISHED },
+    orderBy,
+    take,
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      viewCount: true,
+      likeCount: true,
+      clapCount: true,
+      shareCount: true,
+      bookmarkCount: true,
+      publishedAt: true,
+      category: { select: { name: true } },
+    },
+  });
+}
+
+export async function getReferrerBreakdown() {
+  const user = await requireStaff();
+  if (!user) return [];
+
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const views = await prisma.view.findMany({
+    where: { createdAt: { gte: since } },
+    select: { referrer: true },
+  });
+
+  const counts = new Map<string, number>();
+  for (const v of views) {
+    let source = "Direct";
+    if (v.referrer) {
+      try {
+        source = new URL(v.referrer).hostname.replace(/^www\./, "");
+      } catch {
+        source = "Other";
+      }
+    }
+    counts.set(source, (counts.get(source) ?? 0) + 1);
+  }
+
+  return Array.from(counts.entries())
+    .map(([source, count]) => ({ source, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
 }
