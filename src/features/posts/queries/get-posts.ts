@@ -4,6 +4,7 @@ import { Prisma, PostStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { siteConfig } from "@/config/site";
+import { buildPrefixTsQuery } from "@/lib/search/full-text-query";
 
 export type PostListFilter = {
   status?: PostStatus | PostStatus[];
@@ -72,6 +73,10 @@ export async function getPosts(filter: PostListFilter = {}) {
     pageSize = siteConfig.postsPerPage,
   } = filter;
 
+  if (search) {
+    return searchPostsFullText({ search, status, categorySlug, tagSlug, authorSlug, featured, page, pageSize });
+  }
+
   const where: Prisma.PostWhereInput = {
     deletedAt: null,
     status: Array.isArray(status) ? { in: status } : status,
@@ -79,15 +84,6 @@ export async function getPosts(filter: PostListFilter = {}) {
     ...(tagSlug ? { tags: { some: { slug: tagSlug } } } : {}),
     ...(authorSlug ? { author: { slug: authorSlug } } : {}),
     ...(typeof featured === "boolean" ? { isFeatured: featured } : {}),
-    ...(search
-      ? {
-          OR: [
-            { title: { contains: search, mode: "insensitive" } },
-            { excerpt: { contains: search, mode: "insensitive" } },
-            { subtitle: { contains: search, mode: "insensitive" } },
-          ],
-        }
-      : {}),
   };
 
   const [posts, total] = await Promise.all([
@@ -100,6 +96,105 @@ export async function getPosts(filter: PostListFilter = {}) {
     }),
     prisma.post.count({ where }),
   ]);
+
+  return { posts, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+}
+
+/**
+ * Postgres full-text search over the generated `searchVector` column
+ * (title/subtitle/excerpt weighted above body content — see the
+ * add_fulltext_search migration), ranked with `ts_rank` and prefix-matched
+ * so "secur" finds "security". Runs as raw SQL because tsvector/tsquery
+ * aren't representable in Prisma's query builder; the rest of the filters
+ * are still parameterized through Prisma.sql, so there's no string-built
+ * SQL anywhere in this query.
+ */
+async function searchPostsFullText({
+  search,
+  status,
+  categorySlug,
+  tagSlug,
+  authorSlug,
+  featured,
+  page,
+  pageSize,
+}: {
+  search: string;
+  status: PostStatus | PostStatus[];
+  categorySlug?: string;
+  tagSlug?: string;
+  authorSlug?: string;
+  featured?: boolean;
+  page: number;
+  pageSize: number;
+}) {
+  const tsQuery = buildPrefixTsQuery(search);
+  if (!tsQuery) {
+    return { posts: [], total: 0, page, pageSize, totalPages: 1 };
+  }
+
+  const statusCondition = Array.isArray(status)
+    ? Prisma.sql`p."status" = ANY(${status}::"PostStatus"[])`
+    : Prisma.sql`p."status" = ${status}::"PostStatus"`;
+
+  const conditions: Prisma.Sql[] = [
+    Prisma.sql`p."deletedAt" IS NULL`,
+    statusCondition,
+    Prisma.sql`p."searchVector" @@ to_tsquery('english', ${tsQuery})`,
+  ];
+  if (categorySlug) {
+    conditions.push(Prisma.sql`c."slug" = ${categorySlug}`);
+  }
+  if (authorSlug) {
+    conditions.push(Prisma.sql`a."slug" = ${authorSlug}`);
+  }
+  if (tagSlug) {
+    conditions.push(
+      Prisma.sql`EXISTS (
+        SELECT 1 FROM "_PostToTag" pt
+        JOIN "tags" t ON t.id = pt."B"
+        WHERE pt."A" = p.id AND t.slug = ${tagSlug}
+      )`,
+    );
+  }
+  if (typeof featured === "boolean") {
+    conditions.push(Prisma.sql`p."isFeatured" = ${featured}`);
+  }
+
+  const whereSql = Prisma.join(conditions, " AND ");
+  const fromSql = Prisma.sql`
+    FROM "posts" p
+    LEFT JOIN "categories" c ON c.id = p."categoryId"
+    LEFT JOIN "authors" a ON a.id = p."authorId"
+    WHERE ${whereSql}
+  `;
+
+  const [rows, countRows] = await Promise.all([
+    prisma.$queryRaw<{ id: string }[]>`
+      SELECT p.id
+      ${fromSql}
+      ORDER BY ts_rank(p."searchVector", to_tsquery('english', ${tsQuery})) DESC, p."publishedAt" DESC
+      LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
+    `,
+    prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint AS count
+      ${fromSql}
+    `,
+  ]);
+
+  const orderedIds = rows.map((r) => r.id);
+  const total = Number(countRows[0]?.count ?? 0);
+
+  if (orderedIds.length === 0) {
+    return { posts: [], total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+  }
+
+  const unordered = await prisma.post.findMany({
+    where: { id: { in: orderedIds } },
+    select: publicSelect,
+  });
+  const byId = new Map(unordered.map((p) => [p.id, p]));
+  const posts = orderedIds.map((id) => byId.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
 
   return { posts, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
 }

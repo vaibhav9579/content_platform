@@ -3,6 +3,7 @@ import { PostStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { searchRateLimit, getRequestIdentifier } from "@/lib/rate-limit";
+import { buildPrefixTsQuery } from "@/lib/search/full-text-query";
 
 export async function GET(req: Request) {
   const identifier = await getRequestIdentifier();
@@ -18,18 +19,20 @@ export async function GET(req: Request) {
     return NextResponse.json({ posts: [], categories: [], tags: [], authors: [] });
   }
 
-  const [posts, categories, tags, authors] = await Promise.all([
-    prisma.post.findMany({
-      where: {
-        status: PostStatus.PUBLISHED,
-        OR: [
-          { title: { contains: q, mode: "insensitive" } },
-          { excerpt: { contains: q, mode: "insensitive" } },
-        ],
-      },
-      select: { id: true, title: true, slug: true, coverImageUrl: true },
-      take: 6,
-    }),
+  const tsQuery = buildPrefixTsQuery(q);
+
+  const [postRows, categories, tags, authors] = await Promise.all([
+    tsQuery
+      ? prisma.$queryRaw<{ id: string; title: string; slug: string; coverImageUrl: string | null }[]>`
+          SELECT p.id, p.title, p.slug, p."coverImageUrl"
+          FROM "posts" p
+          WHERE p."deletedAt" IS NULL
+            AND p."status" = ${PostStatus.PUBLISHED}::"PostStatus"
+            AND p."searchVector" @@ to_tsquery('english', ${tsQuery})
+          ORDER BY ts_rank(p."searchVector", to_tsquery('english', ${tsQuery})) DESC
+          LIMIT 6
+        `
+      : Promise.resolve([]),
     prisma.category.findMany({
       where: { name: { contains: q, mode: "insensitive" } },
       select: { id: true, name: true, slug: true },
@@ -47,5 +50,5 @@ export async function GET(req: Request) {
     }),
   ]);
 
-  return NextResponse.json({ posts, categories, tags, authors });
+  return NextResponse.json({ posts: postRows, categories, tags, authors });
 }

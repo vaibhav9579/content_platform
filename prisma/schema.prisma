@@ -186,6 +186,13 @@ model Post {
   canonicalUrl    String?
   metaRobots      String  @default("index, follow")
 
+  /// Postgres-generated tsvector (title/subtitle/excerpt/content, weighted)
+  /// with a GIN index — see the add_fulltext_search migration. Prisma can't
+  /// read or write this type directly; it's queried via $queryRaw in
+  /// features/search. Declared here (Unsupported + optional) purely so
+  /// `prisma migrate dev` doesn't try to drop a column it doesn't recognize.
+  searchVector Unsupported("tsvector")?
+
   coverImageUrl String?
   coverImageAlt String?
   ogImageUrl    String?
