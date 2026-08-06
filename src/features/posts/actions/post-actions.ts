@@ -5,6 +5,7 @@ import { Prisma, PostStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { requireStaff, canPublish } from "@/lib/auth";
+import { getAdminPosts } from "@/features/posts/queries/get-admin-posts";
 import { postInputSchema, type PostInput } from "@/lib/validations";
 import { ensureUniqueSlug } from "@/lib/content/slug";
 import { computeExcerpt, computeMetaDescription, computeReadingStats } from "@/lib/content/reading-time";
@@ -253,4 +254,10 @@ export async function publishDuePosts() {
 
   due.forEach((p) => revalidatePublicPost(p.slug));
   return { published: due.length };
+}
+
+export async function listPostsForAdmin(status?: PostStatus, search?: string) {
+  const user = await requireStaff();
+  if (!user) return [];
+  return getAdminPosts({ status, search });
 }

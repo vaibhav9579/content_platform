@@ -291,6 +291,53 @@
   @apply border-border border px-3 py-2 align-top;
 }
 
+/* ---------------------------------------------------------------------- */
+/* Syntax highlighting (lowlight/highlight.js token classes)              */
+/* ---------------------------------------------------------------------- */
+.hljs-comment,
+.hljs-quote {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-type {
+  color: oklch(0.62 0.19 300);
+}
+.hljs-string,
+.hljs-addition,
+.hljs-attr,
+.hljs-meta-string {
+  color: oklch(0.65 0.15 155);
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: oklch(0.7 0.16 60);
+}
+.hljs-title,
+.hljs-function_,
+.hljs-name,
+.hljs-section {
+  color: oklch(0.62 0.19 255);
+}
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attribute {
+  color: oklch(0.65 0.18 25);
+}
+.hljs-deletion,
+.hljs-regexp {
+  color: var(--destructive);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
+
 @media print {
   nav,
   footer,
