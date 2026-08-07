@@ -1,4 +1,6 @@
 import type { Editor, Range } from "@tiptap/core";
+import { toast } from "sonner";
+import { uploadImage } from "@/lib/image/upload-image";
 import {
   Heading1Icon,
   Heading2Icon,
@@ -43,18 +45,16 @@ async function uploadAndInsertImage(editor: Editor, range: Range) {
   input.onchange = async () => {
     const file = input.files?.[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("folder", "content-platform/posts");
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const json = await res.json();
-    if (res.ok) {
+    try {
+      const media = await uploadImage(file, "content-platform/posts");
       editor
         .chain()
         .focus()
         .deleteRange(range)
-        .setImage({ src: json.media.secureUrl, alt: json.media.altText ?? "" })
+        .setImage({ src: media.secureUrl, alt: media.altText ?? "" })
         .run();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Image upload failed");
     }
   };
   input.click();

@@ -17,6 +17,7 @@ import {
   restoreMedia,
   permanentlyDeleteMedia,
 } from "@/features/media/actions";
+import { compressImageIfNeeded } from "@/lib/image/compress-image";
 
 type Media = {
   id: string;
@@ -51,8 +52,9 @@ export function MediaLibrary({ media }: { media: Media[] }) {
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
+        const { file: uploadFile } = await compressImageIfNeeded(file);
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", uploadFile);
         formData.append("folder", "content-platform/media-library");
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         const json = await res.json();
