@@ -7,6 +7,7 @@ import { ImageUpIcon, Loader2Icon, XIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { compressImageIfNeeded } from "@/lib/image/compress-image";
 
 export function ImageUploadField({
   value,
@@ -21,24 +22,31 @@ export function ImageUploadField({
   aspect?: string;
   label?: string;
 }) {
-  const [uploading, setUploading] = React.useState(false);
+  const [status, setStatus] = React.useState<"idle" | "compressing" | "uploading">("idle");
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File) {
-    setUploading(true);
+    setStatus("compressing");
     try {
+      const { file: uploadFile, didCompress, originalBytes, finalBytes } = await compressImageIfNeeded(file);
+
+      setStatus("uploading");
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", uploadFile);
       formData.append("folder", folder);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Upload failed");
       onChange(json.media.secureUrl);
-      toast.success("Image uploaded");
+      toast.success(
+        didCompress
+          ? `Image uploaded (${formatKb(originalBytes)} → ${formatKb(finalBytes)})`
+          : "Image uploaded",
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
-      setUploading(false);
+      setStatus("idle");
     }
   }
 
@@ -74,8 +82,11 @@ export function ImageUploadField({
               <XIcon className="size-3.5" />
             </Button>
           </>
-        ) : uploading ? (
-          <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
+        ) : status !== "idle" ? (
+          <div className="text-muted-foreground flex flex-col items-center gap-1.5 text-xs">
+            <Loader2Icon className="size-6 animate-spin" />
+            {status === "compressing" ? "Optimizing…" : "Uploading…"}
+          </div>
         ) : (
           <div className="text-muted-foreground flex flex-col items-center gap-1.5 text-xs">
             <ImageUpIcon className="size-6" />
@@ -95,4 +106,8 @@ export function ImageUploadField({
       />
     </div>
   );
+}
+
+function formatKb(bytes: number) {
+  return `${Math.round(bytes / 1024)}KB`;
 }

@@ -58,33 +58,63 @@ export async function POST(req: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const isRasterImage = file.type !== "image/svg+xml" && file.type !== "image/gif";
 
-  const result = await new Promise<import("cloudinary").UploadApiResponse>((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: "image", overwrite: false },
-      (error, res) => {
-        if (error || !res) return reject(error ?? new Error("Upload failed"));
-        resolve(res);
+  try {
+    const result = await new Promise<import("cloudinary").UploadApiResponse>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder,
+          resource_type: "image",
+          overwrite: false,
+          // Cap stored dimensions and let Cloudinary pick the best quality/format
+          // for delivery — a safety net regardless of what the client sent.
+          ...(isRasterImage
+            ? { transformation: [{ width: 2560, height: 2560, crop: "limit" }] }
+            : {}),
+          quality: "auto:good",
+          fetch_format: "auto",
+        },
+        (error, res) => {
+          if (error || !res) return reject(error ?? new Error("Upload failed"));
+          resolve(res);
+        },
+      );
+      stream.end(buffer);
+    });
+
+    const media = await prisma.media.create({
+      data: {
+        publicId: result.public_id,
+        url: result.url,
+        secureUrl: result.secure_url,
+        type: mediaTypeFromMime(file.type),
+        format: result.format,
+        width: result.width,
+        height: result.height,
+        bytes: result.bytes,
+        altText,
+        folder,
+        uploadedById: user.id,
       },
+    });
+
+    return NextResponse.json({ media });
+  } catch (err) {
+    console.error("Upload failed", err);
+    const cloudinaryMessage =
+      err && typeof err === "object" && "message" in err && typeof err.message === "string"
+        ? err.message
+        : null;
+    const isAuthError =
+      err && typeof err === "object" && "http_code" in err && (err.http_code === 401 || err.http_code === 403);
+    return NextResponse.json(
+      {
+        error: isAuthError
+          ? "Cloudinary rejected this upload — check CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET in your .env."
+          : (cloudinaryMessage ?? "Upload failed. Please try again."),
+      },
+      { status: 502 },
     );
-    stream.end(buffer);
-  });
-
-  const media = await prisma.media.create({
-    data: {
-      publicId: result.public_id,
-      url: result.url,
-      secureUrl: result.secure_url,
-      type: mediaTypeFromMime(file.type),
-      format: result.format,
-      width: result.width,
-      height: result.height,
-      bytes: result.bytes,
-      altText,
-      folder,
-      uploadedById: user.id,
-    },
-  });
-
-  return NextResponse.json({ media });
+  }
 }

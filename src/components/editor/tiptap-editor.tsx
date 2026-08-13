@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { toast } from "sonner";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -31,6 +32,7 @@ import { MermaidBlock } from "@/components/editor/extensions/mermaid-block";
 import { MathBlock } from "@/components/editor/extensions/math-block";
 import { TocBlock } from "@/components/editor/extensions/toc-block";
 import { ProsConsBlock } from "@/components/editor/extensions/pros-cons-block";
+import { uploadImage } from "@/lib/image/upload-image";
 
 export type TiptapEditorHandle = {
   getHTML: () => string;
@@ -41,13 +43,13 @@ export type TiptapEditorHandle = {
 };
 
 async function uploadFile(file: File) {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("folder", "content-platform/posts");
-  const res = await fetch("/api/upload", { method: "POST", body: formData });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.media.secureUrl as string;
+  try {
+    const media = await uploadImage(file, "content-platform/posts");
+    return media.secureUrl;
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Image upload failed");
+    return null;
+  }
 }
 
 export const TiptapEditor = React.forwardRef<
