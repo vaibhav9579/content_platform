@@ -14,6 +14,7 @@ import {
   UploadIcon,
   Loader2Icon,
   CheckIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 
 import { TiptapEditor, type TiptapEditorHandle } from "@/components/editor/tiptap-editor";
@@ -32,11 +33,19 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { TagMultiselect } from "@/components/admin/posts/tag-multiselect";
 import { RevisionHistoryDialog } from "@/components/admin/posts/revision-history-dialog";
-import { savePost, autosavePost } from "@/features/posts/actions/post-actions";
+import { savePost, autosavePost, findPostWithSameTitle } from "@/features/posts/actions/post-actions";
 import { exportPostAsMarkdown, importMarkdownAsHtml } from "@/features/posts/actions/markdown-actions";
 import { slugifyTitle } from "@/lib/content/slug";
 import { computeReadingStats } from "@/lib/content/reading-time";
@@ -85,6 +94,16 @@ function toLocalDateTimeInput(value?: string | null) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function localTimezoneLabel() {
+  const offsetMin = -new Date().getTimezoneOffset();
+  const sign = offsetMin >= 0 ? "+" : "-";
+  const abs = Math.abs(offsetMin);
+  const hours = Math.floor(abs / 60);
+  const mins = abs % 60;
+  const offset = `UTC${sign}${hours}${mins ? `:${String(mins).padStart(2, "0")}` : ""}`;
+  return `${Intl.DateTimeFormat().resolvedOptions().timeZone}, ${offset}`;
+}
+
 export function PostEditorShell({
   mode,
   post,
@@ -130,6 +149,15 @@ export function PostEditorShell({
   const [categoryId, setCategoryId] = React.useState(post?.categoryId ?? "");
   const [tagIds, setTagIds] = React.useState<string[]>(post?.tags.map((t) => t.id) ?? []);
 
+  const [hasUnsavedChanges, setHasUnsavedChanges] = React.useState(false);
+  const [autosaveFailing, setAutosaveFailing] = React.useState(false);
+  const [openAccordions, setOpenAccordions] = React.useState<string[]>([]);
+  const [publishConfirm, setPublishConfirm] = React.useState<{
+    warnings: string[];
+    duplicateOf: { title: string; slug: string } | null;
+    checking: boolean;
+  } | null>(null);
+
   const contentRef = React.useRef<{ json: JSONContent; html: string }>({
     json: (post?.contentJson as JSONContent) ?? {},
     html: "",
@@ -140,6 +168,54 @@ export function PostEditorShell({
     const stats = computeReadingStats(payload.html);
     setStats({ words: stats.words, minutes: stats.minutes });
   }
+
+  // Marks the draft dirty on any change so we can warn before an
+  // accidental tab close — deliberately broad (every field, plus `stats`
+  // as a proxy for editor content changes) rather than wiring a dirty flag
+  // into two dozen individual onChange handlers.
+  const isFirstRender = React.useRef(true);
+  React.useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setHasUnsavedChanges(true);
+  }, [
+    title,
+    subtitle,
+    slug,
+    excerpt,
+    metaTitle,
+    metaDescription,
+    canonicalUrl,
+    metaRobots,
+    coverImageUrl,
+    coverImageAlt,
+    status,
+    scheduledAt,
+    difficulty,
+    summary,
+    keyTakeaways,
+    faq,
+    sources,
+    isFeatured,
+    isPinned,
+    allowComments,
+    authorId,
+    categoryId,
+    tagIds,
+    stats,
+  ]);
+
+  React.useEffect(() => {
+    function handler(e: BeforeUnloadEvent) {
+      if (!hasUnsavedChanges) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedChanges]);
 
   function buildInput(overrideStatus?: PostStatus): PostInput {
     return {
@@ -174,6 +250,14 @@ export function PostEditorShell({
     };
   }
 
+  // Kept fresh after every render so the autosave interval (below) can
+  // read current title/author/etc. without stale-closure issues, while
+  // its own effect only needs to restart when `postId` itself changes.
+  const buildInputRef = React.useRef(buildInput);
+  React.useEffect(() => {
+    buildInputRef.current = buildInput;
+  });
+
   function handleSave(overrideStatus?: PostStatus) {
     if (title.trim().length < 3) {
       toast.error("Title must be at least 3 characters");
@@ -189,6 +273,8 @@ export function PostEditorShell({
         if (result.success) {
           toast.success(overrideStatus === PostStatus.PUBLISHED ? "Published!" : "Saved");
           setLastSavedAt(new Date());
+          setHasUnsavedChanges(false);
+          setAutosaveFailing(false);
           if (mode === "create") {
             router.push(`/admin/posts/${result.data.id}/edit`);
           } else {
@@ -198,6 +284,9 @@ export function PostEditorShell({
           }
         } else {
           toast.error(result.error);
+          if (result.section) {
+            setOpenAccordions((prev) => (prev.includes(result.section!) ? prev : [...prev, result.section!]));
+          }
         }
       } catch {
         // A backstop for anything that reaches here unhandled — savePost
@@ -208,17 +297,89 @@ export function PostEditorShell({
     });
   }
 
-  // Autosave every 20s once the post exists.
+  async function handlePublishClick() {
+    if (title.trim().length < 3) {
+      toast.error("Title must be at least 3 characters");
+      return;
+    }
+    if (!authorId) {
+      toast.error("Select an author");
+      return;
+    }
+
+    const html = editorRef.current?.getHTML() ?? contentRef.current.html;
+    const words = computeReadingStats(html).words;
+
+    const warnings: string[] = [];
+    if (!coverImageUrl) warnings.push("No cover image set");
+    if (!metaDescription.trim()) warnings.push("No meta description — one will be auto-generated from the content");
+    if (!categoryId) warnings.push("No category selected");
+    if (words > 0 && words < 100) warnings.push(`Very short content (${words} words)`);
+
+    setPublishConfirm({ warnings, duplicateOf: null, checking: true });
+    const duplicate = await findPostWithSameTitle(title, postId).catch(() => null);
+    setPublishConfirm({
+      warnings,
+      duplicateOf: duplicate ? { title: duplicate.title, slug: duplicate.slug } : null,
+      checking: false,
+    });
+  }
+
+  function confirmPublish() {
+    setPublishConfirm(null);
+    handleSave(PostStatus.PUBLISHED);
+  }
+
+  // Autosave every 20s — including for a brand-new, never-manually-saved
+  // post, which previously had zero protection until the first manual
+  // Save (lose the tab, lose the draft). The first tick silently creates
+  // it as a DRAFT regardless of whatever status is selected; the URL is
+  // then replaced to point at the real post so a refresh can't create a
+  // duplicate. Later ticks just update it in place.
   React.useEffect(() => {
-    if (!postId) return;
-    const interval = setInterval(() => {
-      if (!contentRef.current.html) return;
-      autosavePost(postId, contentRef.current.json, contentRef.current.html).then((res) => {
-        if (res.success) setLastSavedAt(new Date());
-      });
+    const interval = setInterval(async () => {
+      const html = editorRef.current?.getHTML() ?? contentRef.current.html;
+      const hasRealContent = computeReadingStats(html).words > 0;
+      if (!hasRealContent) return;
+
+      if (!postId) {
+        const input = buildInputRef.current(PostStatus.DRAFT);
+        if (input.title.trim().length < 3 || !input.authorId) return;
+        const result = await savePost(input);
+        if (result.success) {
+          setPostId(result.data.id);
+          setSlug(result.data.slug);
+          setLastSavedAt(new Date());
+          setHasUnsavedChanges(false);
+          setAutosaveFailing(false);
+          router.replace(`/admin/posts/${result.data.id}/edit`);
+        } else {
+          setAutosaveFailing((wasFailing) => {
+            if (!wasFailing) {
+              toast.error("Autosave failed — your changes aren't being saved automatically.");
+            }
+            return true;
+          });
+        }
+        return;
+      }
+
+      const res = await autosavePost(postId, contentRef.current.json, contentRef.current.html);
+      if (res.success) {
+        setLastSavedAt(new Date());
+        setHasUnsavedChanges(false);
+        setAutosaveFailing(false);
+      } else {
+        setAutosaveFailing((wasFailing) => {
+          if (!wasFailing) {
+            toast.error("Autosave failed — your changes aren't being saved automatically.");
+          }
+          return true;
+        });
+      }
     }, 20000);
     return () => clearInterval(interval);
-  }, [postId]);
+  }, [postId, router]);
 
   async function handleMarkdownImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -257,12 +418,27 @@ export function PostEditorShell({
             <span>{stats.words} words</span>
             <span>·</span>
             <span>{stats.minutes} min read</span>
-            {lastSavedAt && (
+            {autosaveFailing ? (
               <>
                 <span>·</span>
-                <span className="flex items-center gap-1">
-                  <CheckIcon className="size-3" /> Saved {lastSavedAt.toLocaleTimeString()}
+                <span className="text-destructive flex items-center gap-1">
+                  <TriangleAlertIcon className="size-3" /> Autosave failed — save manually
                 </span>
+              </>
+            ) : (
+              lastSavedAt && (
+                <>
+                  <span>·</span>
+                  <span className="flex items-center gap-1">
+                    <CheckIcon className="size-3" /> Saved {lastSavedAt.toLocaleTimeString()}
+                  </span>
+                </>
+              )
+            )}
+            {hasUnsavedChanges && !autosaveFailing && (
+              <>
+                <span>·</span>
+                <span className="text-muted-foreground">Unsaved changes</span>
               </>
             )}
           </div>
@@ -355,6 +531,7 @@ export function PostEditorShell({
                   value={scheduledAt}
                   onChange={(e) => setScheduledAt(e.target.value)}
                 />
+                <p className="text-muted-foreground text-[11px]">In your local time ({localTimezoneLabel()})</p>
               </div>
             )}
             <div className="flex gap-2 pt-1">
@@ -365,7 +542,7 @@ export function PostEditorShell({
                 variant="secondary"
                 className="flex-1"
                 disabled={pending}
-                onClick={() => handleSave(PostStatus.PUBLISHED)}
+                onClick={handlePublishClick}
               >
                 Publish
               </Button>
@@ -475,7 +652,7 @@ export function PostEditorShell({
 
         <Card>
           <CardContent className="pt-5 pb-2">
-            <Accordion type="multiple" defaultValue={[]}>
+            <Accordion type="multiple" value={openAccordions} onValueChange={setOpenAccordions}>
               <AccordionItem value="seo">
                 <AccordionTrigger>SEO</AccordionTrigger>
                 <AccordionContent className="space-y-3">
@@ -625,6 +802,44 @@ export function PostEditorShell({
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!publishConfirm} onOpenChange={(open) => !open && setPublishConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Publish this post?</DialogTitle>
+            <DialogDescription>It will go live immediately at /blog/{slug || slugifyTitle(title)}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            {publishConfirm?.checking && (
+              <p className="text-muted-foreground flex items-center gap-2">
+                <Loader2Icon className="size-3.5 animate-spin" /> Checking for duplicate titles…
+              </p>
+            )}
+            {publishConfirm?.duplicateOf && (
+              <p className="text-destructive flex items-start gap-2">
+                <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />A post titled &quot;
+                {publishConfirm.duplicateOf.title}&quot; already exists (/blog/{publishConfirm.duplicateOf.slug}).
+              </p>
+            )}
+            {publishConfirm?.warnings.map((w) => (
+              <p key={w} className="text-muted-foreground flex items-start gap-2">
+                <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" /> {w}
+              </p>
+            ))}
+            {!publishConfirm?.checking && publishConfirm?.warnings.length === 0 && !publishConfirm?.duplicateOf && (
+              <p className="text-muted-foreground">Looks good — no issues found.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPublishConfirm(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmPublish} disabled={pending}>
+              {pending && <Loader2Icon className="animate-spin" />} Publish now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

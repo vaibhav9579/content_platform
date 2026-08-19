@@ -10,8 +10,11 @@ import { postInputSchema, type PostInput } from "@/lib/validations";
 import { ensureUniqueSlug } from "@/lib/content/slug";
 import { computeExcerpt, computeMetaDescription, computeReadingStats } from "@/lib/content/reading-time";
 import { addHeadingIds } from "@/lib/content/toc";
+import { sectionForField } from "@/lib/content/post-error-section";
 
-type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
+type ActionResult<T = void> =
+  | { success: true; data: T }
+  | { success: false; error: string; section?: "seo" | "geo" };
 
 function revalidatePublicPost(slug: string) {
   revalidatePath(`/blog/${slug}`);
@@ -25,7 +28,12 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
 
   const parsed = postInputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid post data" };
+    const issue = parsed.error.issues[0];
+    return {
+      success: false,
+      error: issue?.message ?? "Invalid post data",
+      section: issue ? sectionForField(issue.path) : undefined,
+    };
   }
   const input = parsed.data;
 
@@ -303,4 +311,23 @@ export async function listPostsForAdmin(status?: PostStatus, search?: string) {
   const user = await requireStaff();
   if (!user) return [];
   return getAdminPosts({ status, search });
+}
+
+/** Exact, case-insensitive title match — a lightweight nudge, not a hard block, before publishing. */
+export async function findPostWithSameTitle(title: string, excludeId?: string) {
+  const user = await requireStaff();
+  if (!user) return null;
+
+  const trimmed = title.trim();
+  if (!trimmed) return null;
+
+  const match = await prisma.post.findFirst({
+    where: {
+      deletedAt: null,
+      title: { equals: trimmed, mode: "insensitive" },
+      ...(excludeId ? { id: { not: excludeId } } : {}),
+    },
+    select: { id: true, title: true, slug: true, status: true },
+  });
+  return match;
 }

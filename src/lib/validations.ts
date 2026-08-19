@@ -2,19 +2,19 @@ import { z } from "zod";
 import { DifficultyLevel, PostStatus } from "@prisma/client";
 
 export const faqItemSchema = z.object({
-  question: z.string().min(1).max(300),
-  answer: z.string().min(1).max(2000),
+  question: z.string().min(1, "FAQ question can't be empty").max(300, "FAQ question is too long (max 300 characters)"),
+  answer: z.string().min(1, "FAQ answer can't be empty").max(2000, "FAQ answer is too long (max 2000 characters)"),
 });
 
 export const sourceItemSchema = z.object({
-  label: z.string().min(1).max(200),
-  url: z.string().url(),
+  label: z.string().min(1, "Source label can't be empty").max(200, "Source label is too long (max 200 characters)"),
+  url: z.string().url("Source URL must be a valid URL"),
 });
 
 export const postInputSchema = z.object({
   id: z.string().cuid().optional(),
-  title: z.string().min(3, "Title must be at least 3 characters").max(200),
-  subtitle: z.string().max(300).optional().nullable(),
+  title: z.string().min(3, "Title must be at least 3 characters").max(200, "Title is too long (max 200 characters)"),
+  subtitle: z.string().max(300, "Subtitle is too long (max 300 characters)").optional().nullable(),
   slug: z
     .string()
     .min(3)
@@ -23,13 +23,22 @@ export const postInputSchema = z.object({
   contentJson: z.any(),
   contentHtml: z.string().optional().nullable(),
   contentMdx: z.string().optional().nullable(),
-  excerpt: z.string().max(500).optional().nullable(),
-  metaTitle: z.string().max(70).optional().nullable(),
-  metaDescription: z.string().max(160).optional().nullable(),
-  canonicalUrl: z.string().url().optional().nullable().or(z.literal("")),
+  excerpt: z.string().max(500, "Excerpt is too long (max 500 characters)").optional().nullable(),
+  metaTitle: z.string().max(70, "Meta title is too long (max 70 characters)").optional().nullable(),
+  metaDescription: z
+    .string()
+    .max(160, "Meta description is too long (max 160 characters)")
+    .optional()
+    .nullable(),
+  canonicalUrl: z
+    .string()
+    .url("Canonical URL must be a valid URL")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
   metaRobots: z.string().default("index, follow"),
   coverImageUrl: z.string().url().optional().nullable().or(z.literal("")),
-  coverImageAlt: z.string().max(200).optional().nullable(),
+  coverImageAlt: z.string().max(200, "Alt text is too long (max 200 characters)").optional().nullable(),
   ogImageUrl: z.string().url().optional().nullable().or(z.literal("")),
   galleryUrls: z.array(z.string().url()).default([]),
   status: z.nativeEnum(PostStatus).default(PostStatus.DRAFT),
@@ -38,14 +47,14 @@ export const postInputSchema = z.object({
   readingTimeMinutes: z.number().int().positive().optional().nullable(),
   wordCount: z.number().int().nonnegative().optional().nullable(),
   difficulty: z.nativeEnum(DifficultyLevel).optional().nullable(),
-  summary: z.string().max(1000).optional().nullable(),
-  keyTakeaways: z.array(z.string().max(300)).default([]),
+  summary: z.string().max(1000, "Summary is too long (max 1000 characters)").optional().nullable(),
+  keyTakeaways: z.array(z.string().max(300, "A key takeaway is too long (max 300 characters)")).default([]),
   faq: z.array(faqItemSchema).default([]),
   sources: z.array(sourceItemSchema).default([]),
   isFeatured: z.boolean().default(false),
   isPinned: z.boolean().default(false),
   allowComments: z.boolean().default(true),
-  authorId: z.string().cuid(),
+  authorId: z.string().cuid("Select an author"),
   categoryId: z.string().cuid().optional().nullable(),
   tagIds: z.array(z.string().cuid()).default([]),
 });
