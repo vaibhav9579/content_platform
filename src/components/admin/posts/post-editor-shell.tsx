@@ -175,8 +175,8 @@ export function PostEditorShell({
   }
 
   function handleSave(overrideStatus?: PostStatus) {
-    if (!title.trim()) {
-      toast.error("Title is required");
+    if (title.trim().length < 3) {
+      toast.error("Title must be at least 3 characters");
       return;
     }
     if (!authorId) {
@@ -184,19 +184,26 @@ export function PostEditorShell({
       return;
     }
     startTransition(async () => {
-      const result = await savePost(buildInput(overrideStatus));
-      if (result.success) {
-        toast.success(overrideStatus === PostStatus.PUBLISHED ? "Published!" : "Saved");
-        setLastSavedAt(new Date());
-        if (mode === "create") {
-          router.push(`/admin/posts/${result.data.id}/edit`);
+      try {
+        const result = await savePost(buildInput(overrideStatus));
+        if (result.success) {
+          toast.success(overrideStatus === PostStatus.PUBLISHED ? "Published!" : "Saved");
+          setLastSavedAt(new Date());
+          if (mode === "create") {
+            router.push(`/admin/posts/${result.data.id}/edit`);
+          } else {
+            setPostId(result.data.id);
+            setSlug(result.data.slug);
+            router.refresh();
+          }
         } else {
-          setPostId(result.data.id);
-          setSlug(result.data.slug);
-          router.refresh();
+          toast.error(result.error);
         }
-      } else {
-        toast.error(result.error);
+      } catch {
+        // A backstop for anything that reaches here unhandled — savePost
+        // itself wraps its own logic, but a Server Action can still throw
+        // (e.g. a dropped connection), and that should never fail silently.
+        toast.error("Something went wrong while saving. Please try again.");
       }
     });
   }

@@ -33,58 +33,62 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
     return { success: false, error: "Only editors and admins can publish posts." };
   }
 
-  const html = input.contentHtml ?? "";
-  const htmlWithIds = addHeadingIds(html);
-  const readingStats = computeReadingStats(htmlWithIds);
-  const excerpt = input.excerpt?.trim() || computeExcerpt(htmlWithIds);
-  const metaDescription = input.metaDescription?.trim() || computeMetaDescription(htmlWithIds);
-
-  const slug = await ensureUniqueSlug(
-    input.slug || input.title,
-    async (candidate) => {
-      const existing = await prisma.post.findUnique({ where: { slug: candidate } });
-      return !!existing && existing.id !== input.id;
-    },
-    input.id ? input.slug : undefined,
-  );
-
-  const shouldSetPublishedAt = input.status === PostStatus.PUBLISHED;
-
-  const data = {
-    title: input.title,
-    subtitle: input.subtitle || null,
-    slug,
-    contentJson: input.contentJson,
-    contentHtml: htmlWithIds,
-    contentMdx: input.contentMdx || null,
-    excerpt,
-    metaTitle: input.metaTitle || input.title,
-    metaDescription,
-    canonicalUrl: input.canonicalUrl || null,
-    metaRobots: input.metaRobots,
-    coverImageUrl: input.coverImageUrl || null,
-    coverImageAlt: input.coverImageAlt || null,
-    ogImageUrl: input.ogImageUrl || input.coverImageUrl || null,
-    galleryUrls: input.galleryUrls,
-    status: input.status,
-    scheduledAt: input.status === PostStatus.SCHEDULED ? input.scheduledAt : null,
-    readingTimeMinutes: readingStats.minutes,
-    wordCount: readingStats.words,
-    difficulty: input.difficulty ?? undefined,
-    summary: input.summary || null,
-    keyTakeaways: input.keyTakeaways,
-    faq: input.faq,
-    sources: input.sources,
-    isFeatured: input.isFeatured,
-    isPinned: input.isPinned,
-    allowComments: input.allowComments,
-    authorId: input.authorId,
-    categoryId: input.categoryId || null,
-  };
-
-  const tagIds = input.tagIds.map((id) => ({ id }));
-
   try {
+    const html = input.contentHtml ?? "";
+    const htmlWithIds = addHeadingIds(html);
+    const readingStats = computeReadingStats(htmlWithIds);
+    const excerpt = input.excerpt?.trim() || computeExcerpt(htmlWithIds);
+    const metaDescription = input.metaDescription?.trim() || computeMetaDescription(htmlWithIds);
+
+    const rawSlug = await ensureUniqueSlug(
+      input.slug || input.title,
+      async (candidate) => {
+        const existing = await prisma.post.findUnique({ where: { slug: candidate } });
+        return !!existing && existing.id !== input.id;
+      },
+      input.id ? input.slug : undefined,
+    );
+    // A title made entirely of characters slugify can't transliterate
+    // (e.g. non-Latin scripts, emoji-only) collapses to an empty string —
+    // fall back to a short random slug instead of saving an unusable one.
+    const slug = rawSlug || `post-${Math.random().toString(36).slice(2, 8)}`;
+
+    const shouldSetPublishedAt = input.status === PostStatus.PUBLISHED;
+
+    const data = {
+      title: input.title,
+      subtitle: input.subtitle || null,
+      slug,
+      contentJson: input.contentJson,
+      contentHtml: htmlWithIds,
+      contentMdx: input.contentMdx || null,
+      excerpt,
+      metaTitle: input.metaTitle || input.title,
+      metaDescription,
+      canonicalUrl: input.canonicalUrl || null,
+      metaRobots: input.metaRobots,
+      coverImageUrl: input.coverImageUrl || null,
+      coverImageAlt: input.coverImageAlt || null,
+      ogImageUrl: input.ogImageUrl || input.coverImageUrl || null,
+      galleryUrls: input.galleryUrls,
+      status: input.status,
+      scheduledAt: input.status === PostStatus.SCHEDULED ? input.scheduledAt : null,
+      readingTimeMinutes: readingStats.minutes,
+      wordCount: readingStats.words,
+      difficulty: input.difficulty ?? undefined,
+      summary: input.summary || null,
+      keyTakeaways: input.keyTakeaways,
+      faq: input.faq,
+      sources: input.sources,
+      isFeatured: input.isFeatured,
+      isPinned: input.isPinned,
+      allowComments: input.allowComments,
+      authorId: input.authorId,
+      categoryId: input.categoryId || null,
+    };
+
+    const tagIds = input.tagIds.map((id) => ({ id }));
+
     const post = input.id
       ? await prisma.post.update({
           where: { id: input.id },
