@@ -41,6 +41,16 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [];
   },
+
+  async rewrites() {
+    // IndexNow verification: the protocol requires the key to be served
+    // literally at /{key}.txt at the site root. Only rewrites when
+    // INDEXNOW_KEY is set, and only for that exact filename — nothing
+    // else about the site's routing/404 behavior is affected.
+    const key = process.env.INDEXNOW_KEY;
+    if (!key) return [];
+    return [{ source: `/${key}.txt`, destination: "/api/indexnow-key" }];
+  },
 };
 
 export default nextConfig;

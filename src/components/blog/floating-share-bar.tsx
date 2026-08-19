@@ -7,6 +7,7 @@ import { LinkIcon, ArrowUpIcon, CheckIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { recordShare } from "@/features/analytics/actions";
+import { withShareUtm } from "@/lib/analytics/utm-link";
 import { BookmarkButton } from "@/components/blog/bookmark-button";
 
 export function FloatingShareBar({ postId, title }: { postId: string; title: string }) {
@@ -19,21 +20,22 @@ export function FloatingShareBar({ postId, title }: { postId: string; title: str
   }, [scrollYProgress]);
 
   function share(network: "x" | "linkedin" | "facebook") {
-    const url = window.location.href;
+    const url = withShareUtm(window.location.href, network);
     const urls: Record<typeof network, string> = {
       x: `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
     };
     window.open(urls[network], "_blank", "noopener,noreferrer,width=600,height=500");
-    recordShare(postId);
+    recordShare(postId, network);
   }
 
   function copyLink() {
-    navigator.clipboard.writeText(window.location.href);
+    const url = withShareUtm(window.location.href, "copy");
+    navigator.clipboard.writeText(url);
     setCopied(true);
     toast.success("Link copied");
-    recordShare(postId);
+    recordShare(postId, "copy");
     setTimeout(() => setCopied(false), 1500);
   }
 

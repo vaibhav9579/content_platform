@@ -16,6 +16,9 @@ const bodySchema = z.object({
   path: z.string().min(1).max(500),
   postId: z.string().cuid().optional(),
   referrer: z.string().max(2048).optional(),
+  utmSource: z.string().max(100).optional(),
+  utmMedium: z.string().max(100).optional(),
+  utmCampaign: z.string().max(100).optional(),
 });
 
 /**
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
-  const { path, postId, referrer } = parsed.data;
+  const { path, postId, referrer, utmSource, utmMedium, utmCampaign } = parsed.data;
 
   const cookieStore = await cookies();
   const existingVisitorId = cookieStore.get(VISITOR_COOKIE)?.value;
@@ -54,7 +57,7 @@ export async function POST(req: Request) {
     if (!recent) {
       await prisma.$transaction([
         prisma.view.create({
-          data: { visitorId, path, postId, referrer, userAgent, isBot },
+          data: { visitorId, path, postId, referrer, userAgent, isBot, utmSource, utmMedium, utmCampaign },
         }),
         ...(postId && !isBot
           ? [prisma.post.update({ where: { id: postId }, data: { viewCount: { increment: 1 } } })]

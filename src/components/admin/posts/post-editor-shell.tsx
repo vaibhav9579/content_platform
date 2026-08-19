@@ -45,6 +45,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { TagMultiselect } from "@/components/admin/posts/tag-multiselect";
 import { RevisionHistoryDialog } from "@/components/admin/posts/revision-history-dialog";
+import { InternalLinkSuggestions } from "@/components/admin/posts/internal-link-suggestions";
 import { savePost, autosavePost, findPostWithSameTitle } from "@/features/posts/actions/post-actions";
 import { exportPostAsMarkdown, importMarkdownAsHtml } from "@/features/posts/actions/markdown-actions";
 import { slugifyTitle } from "@/lib/content/slug";
@@ -649,6 +650,8 @@ export function PostEditorShell({
             </div>
           </CardContent>
         </Card>
+
+        <InternalLinkSuggestions title={title} postId={postId} />
 
         <Card>
           <CardContent className="pt-5 pb-2">

@@ -227,11 +227,12 @@ model Post {
 
   tags Tag[]
 
-  comments  Comment[]
-  views     View[]
-  bookmarks Bookmark[]
-  reactions Reaction[]
-  revisions PostRevision[]
+  comments    Comment[]
+  views       View[]
+  shareEvents ShareEvent[]
+  bookmarks   Bookmark[]
+  reactions   Reaction[]
+  revisions   PostRevision[]
 
   relatedFrom PostRelation[] @relation("RelatedFrom")
   relatedTo   PostRelation[] @relation("RelatedTo")
@@ -339,21 +340,39 @@ model Bookmark {
 /// not just posts. Human, non-duplicate post views are also aggregated onto
 /// Post.viewCount for fast per-post sorting.
 model View {
-  id        String   @id @default(cuid())
-  path      String // pathname, e.g. "/", "/blog/my-post", "/category/tech"
-  postId    String?
-  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  visitorId String // durable id from an httpOnly first-party cookie
-  isBot     Boolean  @default(false) // known crawler/script UA — excluded from human-facing stats
-  referrer  String?
-  userAgent String?
-  country   String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  path        String // pathname, e.g. "/", "/blog/my-post", "/category/tech"
+  postId      String?
+  post        Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  visitorId   String // durable id from an httpOnly first-party cookie
+  isBot       Boolean  @default(false) // known crawler/script UA — excluded from human-facing stats
+  referrer    String?
+  userAgent   String?
+  country     String?
+  utmSource   String? // captured from the landing page's own query string, e.g. "x", "linkedin"
+  utmMedium   String?
+  utmCampaign String?
+  createdAt   DateTime @default(now())
 
   @@index([postId, createdAt])
   @@index([visitorId, path, createdAt])
   @@index([isBot, createdAt])
+  @@index([utmSource, createdAt])
   @@map("views")
+}
+
+/// One share-button click (or copy-link), per network — powers the
+/// per-channel breakdown in the analytics dashboard.
+model ShareEvent {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  network   String // "x" | "linkedin" | "facebook" | "copy"
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+  @@index([network, createdAt])
+  @@map("share_events")
 }
 
 // ----------------------------------------------------------------------------
@@ -361,13 +380,14 @@ model View {
 // ----------------------------------------------------------------------------
 
 model NewsletterSubscriber {
-  id             String           @id @default(cuid())
-  email          String           @unique
-  status         SubscriberStatus @default(PENDING)
-  source         String?
-  confirmedAt    DateTime?
-  unsubscribedAt DateTime?
-  createdAt      DateTime         @default(now())
+  id                String           @id @default(cuid())
+  email             String           @unique
+  status            SubscriberStatus @default(PENDING)
+  source            String?
+  confirmedAt       DateTime?
+  unsubscribedAt    DateTime?
+  createdAt         DateTime         @default(now())
+  unsubscribeToken  String           @unique @default(cuid())
 
   @@map("newsletter_subscribers")
 }

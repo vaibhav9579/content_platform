@@ -4,9 +4,32 @@ import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/auth";
 import { PostStatus, type Prisma } from "@prisma/client";
 
-export async function recordShare(postId: string) {
-  await prisma.post.update({ where: { id: postId }, data: { shareCount: { increment: 1 } } });
+const SHARE_NETWORKS = new Set(["x", "linkedin", "facebook", "copy"]);
+
+export async function recordShare(postId: string, network: string) {
+  if (!SHARE_NETWORKS.has(network)) return { success: false };
+  await prisma.$transaction([
+    prisma.post.update({ where: { id: postId }, data: { shareCount: { increment: 1 } } }),
+    prisma.shareEvent.create({ data: { postId, network } }),
+  ]);
   return { success: true };
+}
+
+export async function getShareBreakdown() {
+  const user = await requireStaff();
+  if (!user) return [];
+
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const events = await prisma.shareEvent.groupBy({
+    by: ["network"],
+    where: { createdAt: { gte: since } },
+    _count: { _all: true },
+  });
+
+  const labels: Record<string, string> = { x: "X", linkedin: "LinkedIn", facebook: "Facebook", copy: "Copied link" };
+  return events
+    .map((e) => ({ network: labels[e.network] ?? e.network, count: e._count._all }))
+    .sort((a, b) => b.count - a.count);
 }
 
 export async function getDashboardStats() {

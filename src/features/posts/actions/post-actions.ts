@@ -11,6 +11,9 @@ import { ensureUniqueSlug } from "@/lib/content/slug";
 import { computeExcerpt, computeMetaDescription, computeReadingStats } from "@/lib/content/reading-time";
 import { addHeadingIds } from "@/lib/content/toc";
 import { sectionForField } from "@/lib/content/post-error-section";
+import { sendNewPostNotification } from "@/features/newsletter/actions";
+import { pingIndexNow } from "@/lib/seo/indexnow";
+import { buildPrefixTsQuery } from "@/lib/search/full-text-query";
 
 type ActionResult<T = void> =
   | { success: true; data: T }
@@ -109,6 +112,13 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
     // Set publishedAt exactly once, the first time a post goes live.
     if (shouldSetPublishedAt && !post.publishedAt) {
       await prisma.post.update({ where: { id: post.id }, data: { publishedAt: new Date() } });
+      await sendNewPostNotification({
+        title: post.title,
+        excerpt,
+        slug: post.slug,
+        coverImageUrl: post.coverImageUrl,
+      });
+      await pingIndexNow(`/blog/${post.slug}`);
     }
 
     if (input.id) {
@@ -259,14 +269,27 @@ export async function updatePostStatus(
     return { success: false, error: "Only editors and admins can publish posts." };
   }
 
+  const existing = await prisma.post.findUnique({ where: { id }, select: { publishedAt: true } });
+  const isFirstPublish = status === PostStatus.PUBLISHED && !existing?.publishedAt;
+
   const post = await prisma.post.update({
     where: { id },
     data: {
       status,
       scheduledAt: status === PostStatus.SCHEDULED ? scheduledAt : null,
-      publishedAt: status === PostStatus.PUBLISHED ? new Date() : undefined,
+      publishedAt: isFirstPublish ? new Date() : undefined,
     },
   });
+
+  if (isFirstPublish) {
+    await sendNewPostNotification({
+      title: post.title,
+      excerpt: post.excerpt,
+      slug: post.slug,
+      coverImageUrl: post.coverImageUrl,
+    });
+    await pingIndexNow(`/blog/${post.slug}`);
+  }
 
   revalidatePublicPost(post.slug);
   revalidatePath("/admin/posts");
@@ -293,7 +316,7 @@ export async function restoreRevision(revisionId: string): Promise<ActionResult<
 export async function publishDuePosts() {
   const due = await prisma.post.findMany({
     where: { status: PostStatus.SCHEDULED, scheduledAt: { lte: new Date() } },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, title: true, excerpt: true, coverImageUrl: true, publishedAt: true },
   });
 
   if (due.length === 0) return { published: 0 };
@@ -303,7 +326,21 @@ export async function publishDuePosts() {
     data: { status: PostStatus.PUBLISHED, publishedAt: new Date(), scheduledAt: null },
   });
 
-  due.forEach((p) => revalidatePublicPost(p.slug));
+  for (const p of due) {
+    revalidatePublicPost(p.slug);
+    // Skip re-notifying if this post was previously published, scheduled
+    // back, and is now going live again — only ever notify once.
+    if (!p.publishedAt) {
+      await sendNewPostNotification({
+        title: p.title,
+        excerpt: p.excerpt,
+        slug: p.slug,
+        coverImageUrl: p.coverImageUrl,
+      });
+      await pingIndexNow(`/blog/${p.slug}`);
+    }
+  }
+
   return { published: due.length };
 }
 
@@ -330,4 +367,28 @@ export async function findPostWithSameTitle(title: string, excludeId?: string) {
     select: { id: true, title: true, slug: true, status: true },
   });
   return match;
+}
+
+/**
+ * Powers the "internal links you could add" panel in the editor sidebar —
+ * a full-text search against already-published posts, keyed off whatever
+ * title the author is currently writing.
+ */
+export async function findLinkableRelatedPosts(query: string, excludePostId?: string) {
+  const user = await requireStaff();
+  if (!user) return [];
+
+  const tsQuery = buildPrefixTsQuery(query);
+  if (!tsQuery) return [];
+
+  return prisma.$queryRaw<{ id: string; title: string; slug: string }[]>`
+    SELECT p.id, p.title, p.slug
+    FROM "posts" p
+    WHERE p."deletedAt" IS NULL
+      AND p."status" = ${PostStatus.PUBLISHED}::"PostStatus"
+      ${excludePostId ? Prisma.sql`AND p.id != ${excludePostId}` : Prisma.empty}
+      AND p."searchVector" @@ to_tsquery('english', ${tsQuery})
+    ORDER BY ts_rank(p."searchVector", to_tsquery('english', ${tsQuery})) DESC
+    LIMIT 5
+  `;
 }
