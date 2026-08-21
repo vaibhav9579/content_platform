@@ -5,7 +5,31 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/react";
-import { DifficultyLevel, PostStatus } from "@prisma/client";
+import type { DifficultyLevel as DifficultyLevelType, PostStatus as PostStatusType } from "@prisma/client";
+
+// Prisma's generated enum objects (`PostStatus.DRAFT`, etc.) are runtime
+// values from `@prisma/client`, a server-only package — importing them for
+// their *values* into this "use client" component crosses the RSC boundary
+// as an opaque reference, not a plain string, which crashes Prisma's own
+// argument validation when it's later sent back into a Server Action. Only
+// the *type* is imported above; these mirror the enum's literal string
+// values (Prisma enums are always `{ KEY: "KEY" }`) for runtime use.
+const PostStatus = {
+  DRAFT: "DRAFT",
+  IN_REVIEW: "IN_REVIEW",
+  SCHEDULED: "SCHEDULED",
+  PUBLISHED: "PUBLISHED",
+  ARCHIVED: "ARCHIVED",
+} as const satisfies Record<string, PostStatusType>;
+
+const DifficultyLevel = {
+  BEGINNER: "BEGINNER",
+  INTERMEDIATE: "INTERMEDIATE",
+  ADVANCED: "ADVANCED",
+} as const satisfies Record<string, DifficultyLevelType>;
+
+type PostStatus = PostStatusType;
+type DifficultyLevel = DifficultyLevelType;
 import {
   EyeIcon,
   PlusIcon,

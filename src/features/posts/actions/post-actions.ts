@@ -40,6 +40,31 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
   }
   const input = parsed.data;
 
+  {
+    const fs = await import("fs");
+    const report: string[] = [];
+    const seen = new Set<unknown>();
+    function walk(value: unknown, path: string) {
+      try {
+        Object.prototype.toString.call(value);
+      } catch (e) {
+        report.push(`THROWS at ${path}: ${(e as Error).message}`);
+        return;
+      }
+      if (value === null || typeof value !== "object") return;
+      if (seen.has(value)) return;
+      seen.add(value);
+      for (const key of Object.keys(value as object)) {
+        walk((value as Record<string, unknown>)[key], `${path}.${key}`);
+      }
+    }
+    walk(input, "input");
+    fs.appendFileSync(
+      "savepost-field-probe.json",
+      (report.length ? report.join("\n") : "ALL CLEAN") + "\n---\n",
+    );
+  }
+
   if (input.status === PostStatus.PUBLISHED && !canPublish(user.role)) {
     return { success: false, error: "Only editors and admins can publish posts." };
   }
@@ -138,8 +163,46 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
     return { success: true, data: { id: post.id, slug: post.slug } };
   } catch (err) {
     console.error("savePost failed", err);
-    return { success: false, error: "Could not save post. Please try again." };
+    try {
+      const fs = await import("fs");
+      const dump = {
+        message: (err as Error)?.message,
+        stack: (err as Error)?.stack,
+        keys: Object.getOwnPropertyNames(err ?? {}),
+        name: (err as Error)?.name,
+        cause: (err as { cause?: unknown })?.cause ? String((err as { cause?: unknown }).cause) : undefined,
+      };
+      fs.appendFileSync("savepost-error-dump.json", JSON.stringify(dump, null, 2) + "\n---\n");
+    } catch (dumpErr) {
+      console.error("dump failed", dumpErr);
+    }
+    return { success: false, error: describeSaveError(err) };
   }
+}
+
+/**
+ * Maps common failure modes to an actionable message instead of the old
+ * one-size-fits-all "Could not save post" — the editor's author/category/tag
+ * dropdowns are populated once on page load, so a stale selection (the row
+ * was deleted/renamed elsewhere after that) is the most common real cause,
+ * and previously surfaced identically to an actual server outage.
+ */
+function describeSaveError(err: unknown): string {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === "P2003") {
+      const field = (err.meta?.field_name as string | undefined) ?? "";
+      if (field.includes("author")) return "The selected author no longer exists — pick another author and save again.";
+      if (field.includes("category")) return "The selected category no longer exists — pick another category and save again.";
+      return "Could not save post: a related author/category no longer exists. Refresh the page and try again.";
+    }
+    if (err.code === "P2025") {
+      return "One or more selected tags no longer exist — update the tags field and save again.";
+    }
+    if (err.code === "P2002") {
+      return "That URL slug is already in use by another post — choose a different slug.";
+    }
+  }
+  return "Could not save post. Please try again.";
 }
 
 export async function autosavePost(id: string, contentJson: unknown, contentHtml: string) {
