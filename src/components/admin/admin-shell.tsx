@@ -15,6 +15,9 @@ export function AdminShell({ user, children }: { user: User; children: React.Rea
   // avoids a server/client hydration mismatch, at the cost of a brief flash
   // of the expanded sidebar on load for users who left it collapsed.
   React.useEffect(() => {
+    // localStorage only exists client-side, so reading it has to happen in
+    // an effect rather than during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (localStorage.getItem(STORAGE_KEY) === "1") setCollapsed(true);
   }, []);
 

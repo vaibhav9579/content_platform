@@ -50,6 +50,9 @@ export function MediaPickerDialog({
   }, []);
 
   React.useEffect(() => {
+    // Fetching the library's contents when the dialog opens is a sync from
+    // an external system (the server), not state derivable during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) load(1);
   }, [open, load]);
 
