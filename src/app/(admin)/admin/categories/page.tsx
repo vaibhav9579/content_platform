@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 
-import { getCategories } from "@/features/categories/actions";
+import { getCategories, getAllCategoryOptions } from "@/features/categories/actions";
 import { CategoryManager } from "@/components/admin/categories/category-manager";
 
 export const metadata: Metadata = { title: "Categories" };
 
-export default async function AdminCategoriesPage() {
-  const categories = await getCategories();
+export default async function AdminCategoriesPage({ searchParams }: PageProps<"/admin/categories">) {
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
+  const [{ categories, totalCount, totalPages, pageSize }, allCategoryOptions] = await Promise.all([
+    getCategories(page),
+    getAllCategoryOptions(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -16,7 +21,14 @@ export default async function AdminCategoriesPage() {
           Organize articles into unlimited, nestable categories.
         </p>
       </div>
-      <CategoryManager categories={JSON.parse(JSON.stringify(categories))} />
+      <CategoryManager
+        categories={JSON.parse(JSON.stringify(categories))}
+        allCategoryOptions={allCategoryOptions}
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+      />
     </div>
   );
 }

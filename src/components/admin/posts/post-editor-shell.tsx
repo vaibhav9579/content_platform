@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 import type { JSONContent } from "@tiptap/react";
 import type { DifficultyLevel as DifficultyLevelType, PostStatus as PostStatusType } from "@prisma/client";
 
@@ -39,6 +40,8 @@ import {
   Loader2Icon,
   CheckIcon,
   TriangleAlertIcon,
+  ExternalLinkIcon,
+  SparkleIcon,
 } from "lucide-react";
 
 import { TiptapEditor, type TiptapEditorHandle } from "@/components/editor/tiptap-editor";
@@ -182,6 +185,7 @@ export function PostEditorShell({
     duplicateOf: { title: string; slug: string } | null;
     checking: boolean;
   } | null>(null);
+  const [publishSuccess, setPublishSuccess] = React.useState<{ title: string; slug: string } | null>(null);
 
   const contentRef = React.useRef<{ json: JSONContent; html: string }>({
     json: (post?.contentJson as JSONContent) ?? {},
@@ -243,13 +247,20 @@ export function PostEditorShell({
   }, [hasUnsavedChanges]);
 
   function buildInput(overrideStatus?: PostStatus): PostInput {
+    // Read live from the editor instead of trusting the onUpdate-cached
+    // contentRef — that cache can go stale relative to the actual document
+    // after certain paste operations (observed: contentJson caught up via
+    // onUpdate but contentHtml stayed empty), so always resolve the
+    // freshest state right before it's sent to the server.
+    const liveJson = editorRef.current?.getJSON() ?? contentRef.current.json;
+    const liveHtml = editorRef.current?.getHTML() ?? contentRef.current.html;
     return {
       id: postId,
       title,
       subtitle: subtitle || null,
       slug: slug || slugifyTitle(title),
-      contentJson: contentRef.current.json,
-      contentHtml: contentRef.current.html,
+      contentJson: liveJson,
+      contentHtml: liveHtml,
       excerpt: excerpt || null,
       metaTitle: metaTitle || null,
       metaDescription: metaDescription || null,
@@ -296,16 +307,28 @@ export function PostEditorShell({
       try {
         const result = await savePost(buildInput(overrideStatus));
         if (result.success) {
-          toast.success(overrideStatus === PostStatus.PUBLISHED ? "Published!" : "Saved");
+          const justPublished = overrideStatus === PostStatus.PUBLISHED;
           setLastSavedAt(new Date());
           setHasUnsavedChanges(false);
           setAutosaveFailing(false);
-          if (mode === "create") {
-            router.push(`/admin/posts/${result.data.id}/edit`);
+          setStatus(overrideStatus ?? status);
+          setPostId(result.data.id);
+          setSlug(result.data.slug);
+
+          if (justPublished) {
+            // Show the success modal in place of a plain toast every time
+            // the Publish flow completes — defer the route change (new →
+            // edit URL) until the user dismisses it, since navigating now
+            // would remount this component and lose that state before
+            // it's ever shown.
+            setPublishSuccess({ title, slug: result.data.slug });
           } else {
-            setPostId(result.data.id);
-            setSlug(result.data.slug);
-            router.refresh();
+            toast.success("Saved");
+            if (mode === "create") {
+              router.push(`/admin/posts/${result.data.id}/edit`);
+            } else {
+              router.refresh();
+            }
           }
         } else {
           toast.error(result.error);
@@ -432,6 +455,15 @@ export function PostEditorShell({
     a.download = `${slug || "post"}.md`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function dismissPublishSuccess() {
+    setPublishSuccess(null);
+    if (mode === "create" && postId) {
+      router.push(`/admin/posts/${postId}/edit`);
+    } else {
+      router.refresh();
+    }
   }
 
   return (
@@ -864,6 +896,72 @@ export function PostEditorShell({
             <Button onClick={confirmPublish} disabled={pending}>
               {pending && <Loader2Icon className="animate-spin" />} Publish now
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!publishSuccess} onOpenChange={(open) => !open && dismissPublishSuccess()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Post published successfully</DialogTitle>
+            <DialogDescription>Your post has been published and is now live.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 pt-2 pb-1 text-center">
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              className="relative flex size-24 items-center justify-center"
+            >
+              {[
+                { top: "2%", left: "8%", size: 7, delay: 0.3 },
+                { top: "78%", left: "2%", size: 5, delay: 0.45 },
+                { top: "-2%", left: "78%", size: 5, delay: 0.5 },
+                { top: "82%", left: "82%", size: 7, delay: 0.35 },
+              ].map((dot, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: dot.delay, type: "spring", stiffness: 300 }}
+                  className="bg-success/50 absolute rounded-full"
+                  style={{ top: dot.top, left: dot.left, width: dot.size, height: dot.size }}
+                />
+              ))}
+              <SparkleIcon className="text-success/70 absolute -top-1 right-0 size-4" />
+              <SparkleIcon className="text-success/50 absolute bottom-0 -left-1 size-3" />
+              <div className="bg-success/15 flex size-20 items-center justify-center rounded-full">
+                <motion.div
+                  initial={{ scale: 0, rotate: -45 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.15, type: "spring", stiffness: 300, damping: 15 }}
+                >
+                  <CheckIcon className="text-success size-9" strokeWidth={3} />
+                </motion.div>
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-1.5"
+            >
+              <h2 className="text-xl font-semibold">Post Published Successfully!</h2>
+              <p className="text-muted-foreground text-sm text-balance">
+                Your post &quot;
+                <span className="text-success font-medium">{publishSuccess?.title}</span>
+                &quot; has been published and is now live.
+              </p>
+            </motion.div>
+          </div>
+          <div className="border-t" />
+          <DialogFooter className="sm:justify-center">
+            <Button variant="outline" asChild>
+              <a href={`/blog/${publishSuccess?.slug}`} target="_blank" rel="noreferrer">
+                View Post <ExternalLinkIcon />
+              </a>
+            </Button>
+            <Button onClick={() => router.push("/admin/posts")}>Go to Posts</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

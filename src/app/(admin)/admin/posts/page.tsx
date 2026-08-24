@@ -6,7 +6,10 @@ import { PostTable } from "@/components/admin/posts/post-table";
 export const metadata: Metadata = { title: "Posts" };
 
 export default async function AdminPostsPage() {
-  const [posts, counts] = await Promise.all([getAdminPosts(), getPostStatusCounts()]);
+  const [{ posts, totalCount, totalPages, pageSize }, counts] = await Promise.all([
+    getAdminPosts(),
+    getPostStatusCounts(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -14,7 +17,13 @@ export default async function AdminPostsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Posts</h1>
         <p className="text-muted-foreground text-sm">Every draft, scheduled, and published article.</p>
       </div>
-      <PostTable initialPosts={JSON.parse(JSON.stringify(posts))} counts={counts} />
+      <PostTable
+        initialPosts={JSON.parse(JSON.stringify(posts))}
+        counts={counts}
+        initialTotalCount={totalCount}
+        initialTotalPages={totalPages}
+        pageSize={pageSize}
+      />
     </div>
   );
 }

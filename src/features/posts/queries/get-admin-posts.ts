@@ -19,7 +19,10 @@ const adminListSelect = {
   category: { select: { name: true } },
 } satisfies Prisma.PostSelect;
 
-export async function getAdminPosts(opts: { status?: PostStatus; search?: string } = {}) {
+const PAGE_SIZE = 20;
+
+export async function getAdminPosts(opts: { status?: PostStatus; search?: string; page?: number } = {}) {
+  const page = Math.max(1, opts.page ?? 1);
   const where: Prisma.PostWhereInput = {
     deletedAt: null,
     ...(opts.status ? { status: opts.status } : {}),
@@ -28,21 +31,39 @@ export async function getAdminPosts(opts: { status?: PostStatus; search?: string
       : {}),
   };
 
-  return prisma.post.findMany({
-    where,
-    orderBy: { updatedAtCms: "desc" },
-    select: adminListSelect,
-    take: 100,
-  });
+  const [posts, totalCount] = await Promise.all([
+    prisma.post.findMany({
+      where,
+      orderBy: { updatedAtCms: "desc" },
+      select: adminListSelect,
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.post.count({ where }),
+  ]);
+  return { posts, totalCount, page, pageSize: PAGE_SIZE, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)) };
 }
 
-export async function getTrashedPosts() {
-  return prisma.post.findMany({
-    where: { deletedAt: { not: null } },
-    orderBy: { deletedAt: "desc" },
-    select: adminListSelect,
-    take: 200,
-  });
+export async function getTrashedPosts(page = 1) {
+  const currentPage = Math.max(1, page);
+  const where: Prisma.PostWhereInput = { deletedAt: { not: null } };
+  const [posts, totalCount] = await Promise.all([
+    prisma.post.findMany({
+      where,
+      orderBy: { deletedAt: "desc" },
+      select: adminListSelect,
+      skip: (currentPage - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.post.count({ where }),
+  ]);
+  return {
+    posts,
+    totalCount,
+    page: currentPage,
+    pageSize: PAGE_SIZE,
+    totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)),
+  };
 }
 
 export async function getPostStatusCounts(): Promise<Partial<Record<PostStatus, number>> & { TRASH: number }> {

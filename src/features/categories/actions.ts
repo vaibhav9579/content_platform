@@ -9,11 +9,33 @@ import { ensureUniqueSlug } from "@/lib/content/slug";
 
 type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
 
-export async function getCategories() {
-  return prisma.category.findMany({
-    include: { parent: true, _count: { select: { posts: true, children: true } } },
-    orderBy: { name: "asc" },
-  });
+const PAGE_SIZE = 20;
+
+/** Full, unpaginated id/name list — used for the parent-category picker and
+ * to resolve a parent's display name, both of which need every category
+ * regardless of which page the table itself is showing. */
+export async function getAllCategoryOptions() {
+  return prisma.category.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } });
+}
+
+export async function getCategories(page = 1) {
+  const currentPage = Math.max(1, page);
+  const [categories, totalCount] = await Promise.all([
+    prisma.category.findMany({
+      include: { parent: true, _count: { select: { posts: true, children: true } } },
+      orderBy: { name: "asc" },
+      skip: (currentPage - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.category.count(),
+  ]);
+  return {
+    categories,
+    totalCount,
+    page: currentPage,
+    pageSize: PAGE_SIZE,
+    totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)),
+  };
 }
 
 export async function saveCategory(raw: CategoryInput): Promise<ActionResult<{ id: string }>> {

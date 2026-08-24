@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PaginationBar } from "@/components/ui/pagination";
 import {
   listPostsForAdmin,
   listTrashedPostsForAdmin,
@@ -24,7 +25,7 @@ import {
 } from "@/features/posts/actions/post-actions";
 import { formatDate, formatCompactNumber } from "@/lib/utils";
 
-type Post = Awaited<ReturnType<typeof listPostsForAdmin>>[number];
+type Post = Awaited<ReturnType<typeof listPostsForAdmin>>["posts"][number];
 type TabValue = PostStatus | "ALL" | "TRASH";
 
 const TABS: { value: TabValue; label: string }[] = [
@@ -48,47 +49,69 @@ const STATUS_VARIANT: Record<PostStatus, "success" | "secondary" | "outline" | "
 export function PostTable({
   initialPosts,
   counts,
+  initialTotalCount,
+  initialTotalPages,
+  pageSize,
 }: {
   initialPosts: Post[];
   counts: Partial<Record<PostStatus, number>> & { TRASH?: number };
+  initialTotalCount: number;
+  initialTotalPages: number;
+  pageSize: number;
 }) {
   const [tab, setTab] = React.useState<TabValue>("ALL");
   const [search, setSearch] = React.useState("");
   const [posts, setPosts] = React.useState(initialPosts);
+  const [page, setPage] = React.useState(1);
+  const [totalCount, setTotalCount] = React.useState(initialTotalCount);
+  const [totalPages, setTotalPages] = React.useState(initialTotalPages);
   const [pending, startTransition] = useTransition();
 
-  function refetch(nextTab: TabValue, nextSearch: string) {
+  function refetch(nextTab: TabValue, nextSearch: string, nextPage: number) {
     startTransition(async () => {
       if (nextTab === "TRASH") {
-        const result = await listTrashedPostsForAdmin();
-        setPosts(result);
+        const result = await listTrashedPostsForAdmin(nextPage);
+        setPosts(result.posts);
+        setTotalCount(result.totalCount);
+        setTotalPages(result.totalPages);
+        setPage(result.page);
         return;
       }
-      const result = await listPostsForAdmin(nextTab === "ALL" ? undefined : nextTab, nextSearch || undefined);
-      setPosts(result);
+      const result = await listPostsForAdmin(
+        nextTab === "ALL" ? undefined : nextTab,
+        nextSearch || undefined,
+        nextPage,
+      );
+      setPosts(result.posts);
+      setTotalCount(result.totalCount);
+      setTotalPages(result.totalPages);
+      setPage(result.page);
     });
   }
 
   function handleTabChange(value: string) {
     const next = value as TabValue;
     setTab(next);
-    refetch(next, search);
+    refetch(next, search, 1);
   }
 
   const searchTimeout = React.useRef<ReturnType<typeof setTimeout>>(null);
   function handleSearch(value: string) {
     setSearch(value);
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => refetch(tab, value), 300);
+    searchTimeout.current = setTimeout(() => refetch(tab, value, 1), 300);
   }
 
+  // Removing/adding a row can leave the current page short (or overfull by
+  // one), so reload the page from the server rather than patching the local
+  // array — keeps counts/pages accurate.
   function handleDelete(id: string) {
     if (!confirm("Move this post to trash? You can restore it later from the Trash tab.")) return;
     startTransition(async () => {
       const result = await deletePost(id);
       if (result.success) {
-        setPosts((prev) => prev.filter((p) => p.id !== id));
         toast.success("Moved to trash");
+        refetch(tab, search, page);
       } else toast.error(result.error);
     });
   }
@@ -97,8 +120,8 @@ export function PostTable({
     startTransition(async () => {
       const result = await restorePost(id);
       if (result.success) {
-        setPosts((prev) => prev.filter((p) => p.id !== id));
         toast.success("Restored");
+        refetch(tab, search, page);
       } else toast.error(result.error);
     });
   }
@@ -108,8 +131,8 @@ export function PostTable({
     startTransition(async () => {
       const result = await permanentlyDeletePost(id);
       if (result.success) {
-        setPosts((prev) => prev.filter((p) => p.id !== id));
         toast.success("Deleted permanently");
+        refetch(tab, search, page);
       } else toast.error(result.error);
     });
   }
@@ -119,7 +142,7 @@ export function PostTable({
       const result = await duplicatePost(id);
       if (result.success) {
         toast.success("Post duplicated");
-        refetch(tab, search);
+        refetch(tab, search, page);
       } else toast.error(result.error);
     });
   }
@@ -129,7 +152,7 @@ export function PostTable({
       const result = await updatePostStatus(id, "PUBLISHED" as PostStatus);
       if (result.success) {
         toast.success("Published");
-        refetch(tab, search);
+        refetch(tab, search, page);
       } else toast.error(result.error);
     });
   }
@@ -269,6 +292,13 @@ export function PostTable({
           </Table>
         )}
       </div>
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        onPageChange={(p) => refetch(tab, search, p)}
+      />
     </div>
   );
 }

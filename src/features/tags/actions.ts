@@ -9,11 +9,20 @@ import { ensureUniqueSlug } from "@/lib/content/slug";
 
 type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
 
-export async function getTags() {
-  return prisma.tag.findMany({
-    include: { _count: { select: { posts: true } } },
-    orderBy: { name: "asc" },
-  });
+const PAGE_SIZE = 20;
+
+export async function getTags(page = 1) {
+  const currentPage = Math.max(1, page);
+  const [tags, totalCount] = await Promise.all([
+    prisma.tag.findMany({
+      include: { _count: { select: { posts: true } } },
+      orderBy: { name: "asc" },
+      skip: (currentPage - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.tag.count(),
+  ]);
+  return { tags, totalCount, page: currentPage, pageSize: PAGE_SIZE, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)) };
 }
 
 export async function saveTag(raw: TagInput): Promise<ActionResult<{ id: string }>> {

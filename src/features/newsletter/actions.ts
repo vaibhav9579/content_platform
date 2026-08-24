@@ -62,13 +62,42 @@ export async function unsubscribeFromNewsletter(token: string): Promise<ActionRe
   return { success: true, data: undefined };
 }
 
-export async function getSubscribers(status?: SubscriberStatus) {
+const PAGE_SIZE = 20;
+
+export async function getSubscribers(status?: SubscriberStatus, page = 1) {
+  const user = await requireStaff();
+  if (!user) return { subscribers: [], totalCount: 0, activeCount: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 };
+
+  const currentPage = Math.max(1, page);
+  const where = status ? { status } : undefined;
+  const [subscribers, totalCount, activeCount] = await Promise.all([
+    prisma.newsletterSubscriber.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (currentPage - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.newsletterSubscriber.count({ where }),
+    prisma.newsletterSubscriber.count({ where: { status: SubscriberStatus.ACTIVE } }),
+  ]);
+  return {
+    subscribers,
+    totalCount,
+    activeCount,
+    page: currentPage,
+    pageSize: PAGE_SIZE,
+    totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)),
+  };
+}
+
+/** Unpaginated — backs the "Export CSV" button, which needs every row regardless of the table's current page. */
+export async function getAllSubscribersForExport() {
   const user = await requireStaff();
   if (!user) return [];
 
   return prisma.newsletterSubscriber.findMany({
-    where: status ? { status } : undefined,
     orderBy: { createdAt: "desc" },
+    select: { email: true, status: true, source: true, createdAt: true },
   });
 }
 

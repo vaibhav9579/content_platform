@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 import { saveCategory, deleteCategory } from "@/features/categories/actions";
 import { slugifyTitle } from "@/lib/content/slug";
@@ -34,7 +35,21 @@ type Category = {
 
 const emptyForm = { id: undefined as string | undefined, name: "", slug: "", description: "", parentId: "" };
 
-export function CategoryManager({ categories }: { categories: Category[] }) {
+export function CategoryManager({
+  categories,
+  allCategoryOptions,
+  page,
+  totalPages,
+  totalCount,
+  pageSize,
+}: {
+  categories: Category[];
+  allCategoryOptions: { id: string; name: string }[];
+  page: number;
+  totalPages: number;
+  totalCount: number;
+  pageSize: number;
+}) {
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState(emptyForm);
   const [pending, startTransition] = useTransition();
@@ -148,7 +163,7 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No parent (top-level)</SelectItem>
-                      {categories
+                      {allCategoryOptions
                         .filter((c) => c.id !== form.id)
                         .map((c) => (
                           <SelectItem key={c.id} value={c.id}>
@@ -188,7 +203,7 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
                 <TableCell>
                   {category.parentId ? (
                     <Badge variant="outline">
-                      {categories.find((c) => c.id === category.parentId)?.name ?? "—"}
+                      {allCategoryOptions.find((c) => c.id === category.parentId)?.name ?? "—"}
                     </Badge>
                   ) : (
                     <span className="text-muted-foreground">—</span>
@@ -215,6 +230,13 @@ export function CategoryManager({ categories }: { categories: Category[] }) {
           </TableBody>
         </Table>
       </div>
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        hrefForPage={(p) => `/admin/categories?page=${p}`}
+      />
     </div>
   );
 }

@@ -33,6 +33,9 @@ import { MathBlock } from "@/components/editor/extensions/math-block";
 import { TocBlock } from "@/components/editor/extensions/toc-block";
 import { ProsConsBlock } from "@/components/editor/extensions/pros-cons-block";
 import { uploadImage } from "@/lib/image/upload-image";
+import { registerMediaPickerHandler } from "@/lib/editor/media-picker-bridge";
+import { MediaPickerDialog, type PickedMedia } from "@/components/admin/media-picker-dialog";
+import type { Range } from "@tiptap/core";
 
 export type TiptapEditorHandle = {
   getHTML: () => string;
@@ -158,12 +161,34 @@ export const TiptapEditor = React.forwardRef<
     setContent: (content) => editor?.commands.setContent(content),
   }));
 
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const pickerRangeRef = React.useRef<Range | null>(null);
+
+  React.useEffect(() => {
+    if (!editor) return;
+    registerMediaPickerHandler((_editor, range) => {
+      pickerRangeRef.current = range;
+      setPickerOpen(true);
+    });
+    return () => registerMediaPickerHandler(null);
+  }, [editor]);
+
+  function handlePickedImage(media: PickedMedia) {
+    if (!editor) return;
+    const range = pickerRangeRef.current;
+    pickerRangeRef.current = null;
+    const chain = editor.chain().focus();
+    if (range) chain.deleteRange(range);
+    chain.setImage({ src: media.url, alt: media.altText ?? "" }).run();
+  }
+
   if (!editor) return null;
 
   return (
     <div className="w-full">
       <BubbleToolbar editor={editor} />
       <EditorContent editor={editor} />
+      <MediaPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onSelect={handlePickedImage} />
     </div>
   );
 });

@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import { saveTag, deleteTag } from "@/features/tags/actions";
 import { slugifyTitle } from "@/lib/content/slug";
 
@@ -24,7 +25,19 @@ type Tag = { id: string; name: string; slug: string; description: string | null;
 
 const emptyForm = { id: undefined as string | undefined, name: "", slug: "", description: "" };
 
-export function TagManager({ tags }: { tags: Tag[] }) {
+export function TagManager({
+  tags,
+  page,
+  totalPages,
+  totalCount,
+  pageSize,
+}: {
+  tags: Tag[];
+  page: number;
+  totalPages: number;
+  totalCount: number;
+  pageSize: number;
+}) {
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState(emptyForm);
   const [pending, startTransition] = useTransition();
@@ -152,6 +165,13 @@ export function TagManager({ tags }: { tags: Tag[] }) {
           </TableBody>
         </Table>
       </div>
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        hrefForPage={(p) => `/admin/tags?page=${p}`}
+      />
     </div>
   );
 }

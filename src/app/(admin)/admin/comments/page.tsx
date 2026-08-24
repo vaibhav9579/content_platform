@@ -6,7 +6,7 @@ import { CommentModerationTable } from "@/components/admin/comments/comment-mode
 export const metadata: Metadata = { title: "Comments" };
 
 export default async function AdminCommentsPage() {
-  const comments = await getAllComments();
+  const { comments, totalCount, totalPages, pageSize } = await getAllComments();
 
   return (
     <div className="space-y-6">
@@ -14,7 +14,12 @@ export default async function AdminCommentsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Comments</h1>
         <p className="text-muted-foreground text-sm">Moderate reader discussion across every article.</p>
       </div>
-      <CommentModerationTable comments={JSON.parse(JSON.stringify(comments))} />
+      <CommentModerationTable
+        comments={JSON.parse(JSON.stringify(comments))}
+        initialTotalCount={totalCount}
+        initialTotalPages={totalPages}
+        pageSize={pageSize}
+      />
     </div>
   );
 }

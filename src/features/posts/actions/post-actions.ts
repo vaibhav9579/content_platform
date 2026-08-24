@@ -40,31 +40,6 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
   }
   const input = parsed.data;
 
-  {
-    const fs = await import("fs");
-    const report: string[] = [];
-    const seen = new Set<unknown>();
-    function walk(value: unknown, path: string) {
-      try {
-        Object.prototype.toString.call(value);
-      } catch (e) {
-        report.push(`THROWS at ${path}: ${(e as Error).message}`);
-        return;
-      }
-      if (value === null || typeof value !== "object") return;
-      if (seen.has(value)) return;
-      seen.add(value);
-      for (const key of Object.keys(value as object)) {
-        walk((value as Record<string, unknown>)[key], `${path}.${key}`);
-      }
-    }
-    walk(input, "input");
-    fs.appendFileSync(
-      "savepost-field-probe.json",
-      (report.length ? report.join("\n") : "ALL CLEAN") + "\n---\n",
-    );
-  }
-
   if (input.status === PostStatus.PUBLISHED && !canPublish(user.role)) {
     return { success: false, error: "Only editors and admins can publish posts." };
   }
@@ -91,11 +66,20 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
 
     const shouldSetPublishedAt = input.status === PostStatus.PUBLISHED;
 
+    // The Tiptap document arrives from the client as a Server Action
+    // argument; round-tripping it through JSON strips any non-plain
+    // reference it might carry across that boundary (Next's RSC layer can
+    // wrap client-originated object graphs in ways Prisma's own argument
+    // inspection then trips over — see the incident notes for savePost).
+    // A Json column can only ever hold plain JSON anyway, so this is lossless.
+    const sanitizedContentJson =
+      input.contentJson == null ? input.contentJson : JSON.parse(JSON.stringify(input.contentJson));
+
     const data = {
       title: input.title,
       subtitle: input.subtitle || null,
       slug,
-      contentJson: input.contentJson,
+      contentJson: sanitizedContentJson,
       contentHtml: htmlWithIds,
       contentMdx: input.contentMdx || null,
       excerpt,
@@ -163,19 +147,6 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
     return { success: true, data: { id: post.id, slug: post.slug } };
   } catch (err) {
     console.error("savePost failed", err);
-    try {
-      const fs = await import("fs");
-      const dump = {
-        message: (err as Error)?.message,
-        stack: (err as Error)?.stack,
-        keys: Object.getOwnPropertyNames(err ?? {}),
-        name: (err as Error)?.name,
-        cause: (err as { cause?: unknown })?.cause ? String((err as { cause?: unknown }).cause) : undefined,
-      };
-      fs.appendFileSync("savepost-error-dump.json", JSON.stringify(dump, null, 2) + "\n---\n");
-    } catch (dumpErr) {
-      console.error("dump failed", dumpErr);
-    }
     return { success: false, error: describeSaveError(err) };
   }
 }
@@ -273,10 +244,10 @@ export async function permanentlyDeletePost(id: string): Promise<ActionResult> {
   return { success: true, data: undefined };
 }
 
-export async function listTrashedPostsForAdmin() {
+export async function listTrashedPostsForAdmin(page?: number) {
   const user = await requireStaff();
-  if (!user) return [];
-  return getTrashedPosts();
+  if (!user) return { posts: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 1 };
+  return getTrashedPosts(page);
 }
 
 export async function duplicatePost(id: string): Promise<ActionResult<{ id: string }>> {
@@ -407,10 +378,10 @@ export async function publishDuePosts() {
   return { published: due.length };
 }
 
-export async function listPostsForAdmin(status?: PostStatus, search?: string) {
+export async function listPostsForAdmin(status?: PostStatus, search?: string, page?: number) {
   const user = await requireStaff();
-  if (!user) return [];
-  return getAdminPosts({ status, search });
+  if (!user) return { posts: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 1 };
+  return getAdminPosts({ status, search, page });
 }
 
 /** Exact, case-insensitive title match — a lightweight nudge, not a hard block, before publishing. */

@@ -123,22 +123,31 @@ export async function permanentlyDeleteComment(id: string): Promise<ActionResult
   return { success: true, data: undefined };
 }
 
-export async function getAllComments(opts: { status?: CommentStatus; trashed?: boolean } = {}) {
-  const user = await requireStaff();
-  if (!user) return [];
+const PAGE_SIZE = 20;
 
-  return prisma.comment.findMany({
-    where: {
-      deletedAt: opts.trashed ? { not: null } : null,
-      ...(opts.status ? { status: opts.status } : {}),
-    },
-    include: {
-      user: { select: { name: true, email: true, imageUrl: true } },
-      post: { select: { title: true, slug: true } },
-    },
-    orderBy: opts.trashed ? { deletedAt: "desc" } : { createdAt: "desc" },
-    take: 200,
-  });
+export async function getAllComments(opts: { status?: CommentStatus; trashed?: boolean; page?: number } = {}) {
+  const user = await requireStaff();
+  if (!user) return { comments: [], totalCount: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 };
+
+  const page = Math.max(1, opts.page ?? 1);
+  const where = {
+    deletedAt: opts.trashed ? { not: null } : null,
+    ...(opts.status ? { status: opts.status } : {}),
+  };
+  const [comments, totalCount] = await Promise.all([
+    prisma.comment.findMany({
+      where,
+      include: {
+        user: { select: { name: true, email: true, imageUrl: true } },
+        post: { select: { title: true, slug: true } },
+      },
+      orderBy: opts.trashed ? { deletedAt: "desc" } : { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.comment.count({ where }),
+  ]);
+  return { comments, totalCount, page, pageSize: PAGE_SIZE, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)) };
 }
 
 export async function getApprovedComments(postId: string) {

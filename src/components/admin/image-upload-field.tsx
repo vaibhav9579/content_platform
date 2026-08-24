@@ -8,6 +8,7 @@ import { ImageUpIcon, Loader2Icon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { compressImageIfNeeded } from "@/lib/image/compress-image";
+import { MediaPickerDialog, type PickedMedia } from "@/components/admin/media-picker-dialog";
 
 export function ImageUploadField({
   value,
@@ -23,8 +24,11 @@ export function ImageUploadField({
   label?: string;
 }) {
   const [status, setStatus] = React.useState<"idle" | "compressing" | "uploading">("idle");
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
 
+  // Drag-and-drop is a deliberate fast path — dropping a specific file means
+  // "use this one", so it uploads immediately rather than opening the
+  // picker. A plain click opens the picker (upload new or reuse existing).
   async function handleFile(file: File) {
     setStatus("compressing");
     try {
@@ -50,6 +54,10 @@ export function ImageUploadField({
     }
   }
 
+  function handlePicked(media: PickedMedia) {
+    onChange(media.url);
+  }
+
   return (
     <div className="space-y-2">
       {label && <p className="text-sm font-medium">{label}</p>}
@@ -58,7 +66,7 @@ export function ImageUploadField({
           "bg-muted/40 border-border relative flex cursor-pointer items-center justify-center overflow-hidden rounded-lg border border-dashed",
           aspect,
         )}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => setPickerOpen(true)}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
@@ -90,20 +98,11 @@ export function ImageUploadField({
         ) : (
           <div className="text-muted-foreground flex flex-col items-center gap-1.5 text-xs">
             <ImageUpIcon className="size-6" />
-            Click or drag image to upload
+            Click to choose, or drag an image to upload
           </div>
         )}
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFile(file);
-        }}
-      />
+      <MediaPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onSelect={handlePicked} folder={folder} />
     </div>
   );
 }

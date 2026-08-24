@@ -18,6 +18,7 @@ import {
   permanentlyDeleteMedia,
 } from "@/features/media/actions";
 import { compressImageIfNeeded } from "@/lib/image/compress-image";
+import { PaginationBar } from "@/components/ui/pagination";
 
 type Media = {
   id: string;
@@ -31,21 +32,41 @@ type Media = {
   createdAt: string;
 };
 
-export function MediaLibrary({ media }: { media: Media[] }) {
+export function MediaLibrary({
+  media,
+  initialTotalCount,
+  initialTotalPages,
+  pageSize,
+}: {
+  media: Media[];
+  initialTotalCount: number;
+  initialTotalPages: number;
+  pageSize: number;
+}) {
   const [tab, setTab] = React.useState<"active" | "trash">("active");
   const [items, setItems] = React.useState(media);
+  const [page, setPage] = React.useState(1);
+  const [totalCount, setTotalCount] = React.useState(initialTotalCount);
+  const [totalPages, setTotalPages] = React.useState(initialTotalPages);
   const [uploading, setUploading] = React.useState(false);
   const [selected, setSelected] = React.useState<Media | null>(null);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const inputRef = React.useRef<HTMLInputElement>(null);
 
+  function loadPage(nextTab: "active" | "trash", nextPage: number) {
+    startTransition(async () => {
+      const result = await getMedia({ trashed: nextTab === "trash", page: nextPage });
+      setItems(JSON.parse(JSON.stringify(result.media)));
+      setTotalCount(result.totalCount);
+      setTotalPages(result.totalPages);
+      setPage(result.page);
+    });
+  }
+
   function loadTab(next: "active" | "trash") {
     setTab(next);
-    startTransition(async () => {
-      const result = await getMedia({ trashed: next === "trash" });
-      setItems(JSON.parse(JSON.stringify(result)));
-    });
+    loadPage(next, 1);
   }
 
   async function handleUpload(files: FileList) {
@@ -59,9 +80,12 @@ export function MediaLibrary({ media }: { media: Media[] }) {
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error);
-        setItems((prev) => [json.media, ...prev]);
       }
       toast.success("Upload complete");
+      // New uploads sort first (createdAt desc) — reload page 1 so they're
+      // visible immediately rather than only appearing once the count/pages
+      // catch up on the next navigation.
+      loadPage(tab, 1);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -75,12 +99,15 @@ export function MediaLibrary({ media }: { media: Media[] }) {
     setTimeout(() => setCopiedId(null), 1500);
   }
 
+  // Removing a row can leave the current page short by one (with more
+  // available on the next page), so reload the page from the server rather
+  // than just filtering the local array — keeps counts/pages accurate.
   function handleTrash(id: string) {
     startTransition(async () => {
       const result = await deleteMedia(id);
       if (result.success) {
-        setItems((prev) => prev.filter((m) => m.id !== id));
         toast.success("Moved to trash");
+        loadPage(tab, page);
       } else toast.error(result.error);
     });
   }
@@ -89,8 +116,8 @@ export function MediaLibrary({ media }: { media: Media[] }) {
     startTransition(async () => {
       const result = await restoreMedia(id);
       if (result.success) {
-        setItems((prev) => prev.filter((m) => m.id !== id));
         toast.success("Restored");
+        loadPage(tab, page);
       } else toast.error(result.error);
     });
   }
@@ -100,8 +127,8 @@ export function MediaLibrary({ media }: { media: Media[] }) {
     startTransition(async () => {
       const result = await permanentlyDeleteMedia(id);
       if (result.success) {
-        setItems((prev) => prev.filter((m) => m.id !== id));
         toast.success("Deleted permanently");
+        loadPage(tab, page);
       } else toast.error(result.error);
     });
   }
@@ -158,6 +185,14 @@ export function MediaLibrary({ media }: { media: Media[] }) {
           </p>
         )}
       </div>
+
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        onPageChange={(p) => loadPage(tab, p)}
+      />
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent>

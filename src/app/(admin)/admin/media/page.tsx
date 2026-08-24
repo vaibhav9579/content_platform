@@ -6,7 +6,7 @@ import { MediaLibrary } from "@/components/admin/media/media-library";
 export const metadata: Metadata = { title: "Media Library" };
 
 export default async function AdminMediaPage() {
-  const media = await getMedia();
+  const { media, totalCount, totalPages, pageSize } = await getMedia();
 
   return (
     <div className="space-y-6">
@@ -16,7 +16,12 @@ export default async function AdminMediaPage() {
           Every image uploaded through the editor, optimized and served via Cloudinary.
         </p>
       </div>
-      <MediaLibrary media={JSON.parse(JSON.stringify(media))} />
+      <MediaLibrary
+        media={JSON.parse(JSON.stringify(media))}
+        initialTotalCount={totalCount}
+        initialTotalPages={totalPages}
+        pageSize={pageSize}
+      />
     </div>
   );
 }

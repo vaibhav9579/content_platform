@@ -1,6 +1,5 @@
 import type { Editor, Range } from "@tiptap/core";
-import { toast } from "sonner";
-import { uploadImage } from "@/lib/image/upload-image";
+import { requestMediaPicker } from "@/lib/editor/media-picker-bridge";
 import {
   Heading1Icon,
   Heading2Icon,
@@ -37,28 +36,6 @@ export type SlashCommandItem = {
   keywords?: string[];
   command: (opts: { editor: Editor; range: Range }) => void;
 };
-
-async function uploadAndInsertImage(editor: Editor, range: Range) {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = "image/png,image/jpeg,image/webp,image/gif,image/avif";
-  input.onchange = async () => {
-    const file = input.files?.[0];
-    if (!file) return;
-    try {
-      const media = await uploadImage(file, "content-platform/posts");
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
-        .setImage({ src: media.secureUrl, alt: media.altText ?? "" })
-        .run();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Image upload failed");
-    }
-  };
-  input.click();
-}
 
 const ALL_ITEMS: SlashCommandItem[] = [
   {
@@ -141,9 +118,9 @@ const ALL_ITEMS: SlashCommandItem[] = [
   },
   {
     title: "Image",
-    description: "Upload an image",
+    description: "Upload or choose an image",
     icon: ImageIcon,
-    command: ({ editor, range }) => uploadAndInsertImage(editor, range),
+    command: ({ editor, range }) => requestMediaPicker(editor, range),
   },
   {
     title: "YouTube",

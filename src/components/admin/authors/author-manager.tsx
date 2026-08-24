@@ -20,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { saveAuthor, deleteAuthor } from "@/features/authors/actions";
 import { slugifyTitle } from "@/lib/content/slug";
@@ -55,7 +56,19 @@ const emptyForm = {
   featured: false,
 };
 
-export function AuthorManager({ authors }: { authors: Author[] }) {
+export function AuthorManager({
+  authors,
+  page,
+  totalPages,
+  totalCount,
+  pageSize,
+}: {
+  authors: Author[];
+  page: number;
+  totalPages: number;
+  totalCount: number;
+  pageSize: number;
+}) {
   const [open, setOpen] = React.useState(false);
   const [form, setForm] = React.useState(emptyForm);
   const [pending, startTransition] = useTransition();
@@ -272,6 +285,13 @@ export function AuthorManager({ authors }: { authors: Author[] }) {
           </TableBody>
         </Table>
       </div>
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        hrefForPage={(p) => `/admin/authors?page=${p}`}
+      />
     </div>
   );
 }

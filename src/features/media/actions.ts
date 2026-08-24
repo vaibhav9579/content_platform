@@ -8,15 +8,24 @@ import { cloudinary } from "@/lib/cloudinary";
 
 type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
 
-export async function getMedia(opts: { folder?: string; trashed?: boolean } = {}) {
-  return prisma.media.findMany({
-    where: {
-      deletedAt: opts.trashed ? { not: null } : null,
-      ...(opts.folder ? { folder: opts.folder } : {}),
-    },
-    orderBy: opts.trashed ? { deletedAt: "desc" } : { createdAt: "desc" },
-    take: 200,
-  });
+const PAGE_SIZE = 24;
+
+export async function getMedia(opts: { folder?: string; trashed?: boolean; page?: number } = {}) {
+  const page = Math.max(1, opts.page ?? 1);
+  const where = {
+    deletedAt: opts.trashed ? { not: null } : null,
+    ...(opts.folder ? { folder: opts.folder } : {}),
+  };
+  const [media, totalCount] = await Promise.all([
+    prisma.media.findMany({
+      where,
+      orderBy: opts.trashed ? { deletedAt: "desc" } : { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    }),
+    prisma.media.count({ where }),
+  ]);
+  return { media, totalCount, page, pageSize: PAGE_SIZE, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)) };
 }
 
 export async function updateMediaAltText(id: string, altText: string): Promise<ActionResult> {

@@ -9,6 +9,7 @@ import { CheckIcon, XIcon, ShieldAlertIcon, Trash2Icon, RotateCcwIcon } from "lu
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PaginationBar } from "@/components/ui/pagination";
 import {
   moderateComment,
   deleteComment,
@@ -35,9 +36,22 @@ const statusVariant: Record<string, "success" | "secondary" | "destructive" | "o
   REJECTED: "outline",
 };
 
-export function CommentModerationTable({ comments: initialComments }: { comments: Comment[] }) {
+export function CommentModerationTable({
+  comments: initialComments,
+  initialTotalCount,
+  initialTotalPages,
+  pageSize,
+}: {
+  comments: Comment[];
+  initialTotalCount: number;
+  initialTotalPages: number;
+  pageSize: number;
+}) {
   const [tab, setTab] = React.useState<"active" | "trash">("active");
   const [comments, setComments] = React.useState(initialComments);
+  const [page, setPage] = React.useState(1);
+  const [totalCount, setTotalCount] = React.useState(initialTotalCount);
+  const [totalPages, setTotalPages] = React.useState(initialTotalPages);
   const [pending, startTransition] = useTransition();
 
   function act(id: string, fn: () => Promise<{ success: boolean; error?: string }>, refetch = false) {
@@ -45,17 +59,24 @@ export function CommentModerationTable({ comments: initialComments }: { comments
       const result = await fn();
       if (result.success) {
         toast.success("Updated");
-        if (refetch) loadTab(tab);
+        if (refetch) loadPage(tab, page);
       } else toast.error(result.error);
+    });
+  }
+
+  function loadPage(nextTab: "active" | "trash", nextPage: number) {
+    startTransition(async () => {
+      const result = await getAllComments({ trashed: nextTab === "trash", page: nextPage });
+      setComments(JSON.parse(JSON.stringify(result.comments)));
+      setTotalCount(result.totalCount);
+      setTotalPages(result.totalPages);
+      setPage(result.page);
     });
   }
 
   function loadTab(next: "active" | "trash") {
     setTab(next);
-    startTransition(async () => {
-      const result = await getAllComments({ trashed: next === "trash" });
-      setComments(JSON.parse(JSON.stringify(result)));
-    });
+    loadPage(next, 1);
   }
 
   return (
@@ -166,6 +187,13 @@ export function CommentModerationTable({ comments: initialComments }: { comments
           </p>
         )}
       </div>
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        totalCount={totalCount}
+        pageSize={pageSize}
+        onPageChange={(p) => loadPage(tab, p)}
+      />
     </div>
   );
 }
