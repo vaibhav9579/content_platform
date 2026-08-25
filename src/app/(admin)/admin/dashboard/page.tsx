@@ -11,6 +11,8 @@ import {
   TrendingUpIcon,
   TrendingDownIcon,
   CalendarIcon,
+  ClipboardCheckIcon,
+  ArrowRightIcon,
 } from "lucide-react";
 
 import { redirect } from "next/navigation";
@@ -96,6 +98,19 @@ export default async function AdminDashboardPage() {
         </Badge>
       </div>
 
+      {oversight && stats.inReview > 0 && (
+        <Link
+          href="/admin/posts"
+          className="border-warning/30 bg-warning/10 hover:bg-warning/15 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm transition-colors"
+        >
+          <span className="flex items-center gap-2.5 font-medium">
+            <ClipboardCheckIcon className="text-warning size-4 shrink-0" />
+            {stats.inReview} post{stats.inReview === 1 ? "" : "s"} waiting for your review before they can publish
+          </span>
+          <ArrowRightIcon className="size-4 shrink-0" />
+        </Link>
+      )}
+
       <div className={cn("grid grid-cols-2 gap-4", oversight ? "lg:grid-cols-5" : "lg:grid-cols-4")}>
         {visibleCards.map((card) => {
           const trend = card.trendKey ? stats.trends[card.trendKey] : null;
@@ -151,16 +166,18 @@ export default async function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4 pb-5">
             <StatusDonut
-              total={stats.published + stats.drafts + stats.scheduled}
+              total={stats.published + stats.drafts + stats.inReview + stats.scheduled}
               slices={[
                 { label: "Published", value: stats.published, color: "var(--color-primary)" },
                 { label: "Drafts", value: stats.drafts, color: "var(--color-chart-2)" },
+                { label: "In Review", value: stats.inReview, color: "var(--color-warning)" },
                 { label: "Scheduled", value: stats.scheduled, color: "var(--color-chart-4)" },
               ]}
             />
             <div className="space-y-2.5">
               <StatusRow icon={FileTextIcon} label="Published" value={stats.published} dot="bg-primary" />
               <StatusRow icon={ClockIcon} label="Drafts" value={stats.drafts} dot="bg-chart-2" />
+              <StatusRow icon={ClipboardCheckIcon} label="In Review" value={stats.inReview} dot="bg-warning" />
               <StatusRow icon={CalendarClockIcon} label="Scheduled" value={stats.scheduled} dot="bg-chart-4" />
             </div>
           </CardContent>

@@ -13,6 +13,7 @@ import { addHeadingIds } from "@/lib/content/toc";
 import { sectionForField } from "@/lib/content/post-error-section";
 import { ownsPost, scopeAuthorId } from "@/lib/content/post-authorization";
 import { sendNewPostNotification } from "@/features/newsletter/actions";
+import { sendReviewRequestNotification } from "@/lib/email/notify-review-request";
 import { pingIndexNow } from "@/lib/seo/indexnow";
 import { buildPrefixTsQuery } from "@/lib/search/full-text-query";
 
@@ -46,6 +47,15 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
   }
 
   let authorId = input.authorId;
+  let priorStatus: PostStatus | null = null;
+  if (input.id) {
+    const existing = await prisma.post.findUnique({ where: { id: input.id }, select: { authorId: true, status: true } });
+    priorStatus = existing?.status ?? null;
+    if (!canManageAllPosts(user.role) && existing && existing.authorId !== user.author?.id) {
+      return { success: false, error: "You can only edit your own posts." };
+    }
+  }
+
   if (!canManageAllPosts(user.role)) {
     // Authors/contributors can only ever write under their own byline —
     // ignore whatever authorId the client sent and pin it to their own.
@@ -53,13 +63,6 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
       return { success: false, error: "Your author profile isn't set up yet — ask an admin to check your account." };
     }
     authorId = user.author.id;
-
-    if (input.id) {
-      const existing = await prisma.post.findUnique({ where: { id: input.id }, select: { authorId: true } });
-      if (existing && existing.authorId !== user.author.id) {
-        return { success: false, error: "You can only edit your own posts." };
-      }
-    }
   }
 
   try {
@@ -146,6 +149,13 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
         coverImageUrl: post.coverImageUrl,
       });
       await pingIndexNow(`/blog/${post.slug}`);
+    }
+
+    // Nothing goes live without an admin/editor publishing it — let them
+    // know the moment something is waiting on them, not just when they
+    // happen to check the Posts list.
+    if (input.status === PostStatus.IN_REVIEW && priorStatus !== PostStatus.IN_REVIEW) {
+      await sendReviewRequestNotification({ id: post.id, title: post.title }, user.name);
     }
 
     if (input.id) {
@@ -334,7 +344,10 @@ export async function updatePostStatus(
     return { success: false, error: "Only editors and admins can publish posts." };
   }
 
-  const existing = await prisma.post.findUnique({ where: { id }, select: { publishedAt: true, authorId: true } });
+  const existing = await prisma.post.findUnique({
+    where: { id },
+    select: { publishedAt: true, authorId: true, status: true },
+  });
   if (!existing) return { success: false, error: "Post not found" };
   if (!ownsPost(user, existing)) return { success: false, error: "You can only manage your own posts." };
   const isFirstPublish = status === PostStatus.PUBLISHED && !existing.publishedAt;
@@ -356,6 +369,10 @@ export async function updatePostStatus(
       coverImageUrl: post.coverImageUrl,
     });
     await pingIndexNow(`/blog/${post.slug}`);
+  }
+
+  if (status === PostStatus.IN_REVIEW && existing.status !== PostStatus.IN_REVIEW) {
+    await sendReviewRequestNotification({ id: post.id, title: post.title }, user.name);
   }
 
   revalidatePublicPost(post.slug);

@@ -44,12 +44,13 @@ export async function getDashboardStats() {
   const scoped = authorId ? { authorId } : {};
   const scopedByPost = authorId ? { post: { authorId } } : {};
 
-  const [totalPosts, published, drafts, scheduled, totalViews, totalComments, pendingComments, subscribers, topPosts] =
+  const [totalPosts, published, drafts, scheduled, inReview, totalViews, totalComments, pendingComments, subscribers, topPosts] =
     await Promise.all([
       prisma.post.count({ where: { deletedAt: null, ...scoped } }),
       prisma.post.count({ where: { status: PostStatus.PUBLISHED, deletedAt: null, ...scoped } }),
       prisma.post.count({ where: { status: PostStatus.DRAFT, deletedAt: null, ...scoped } }),
       prisma.post.count({ where: { status: PostStatus.SCHEDULED, deletedAt: null, ...scoped } }),
+      prisma.post.count({ where: { status: PostStatus.IN_REVIEW, deletedAt: null, ...scoped } }),
       prisma.post.aggregate({ where: { deletedAt: null, ...scoped }, _sum: { viewCount: true } }),
       prisma.comment.count({ where: { deletedAt: null, ...scopedByPost } }),
       prisma.comment.count({ where: { status: "PENDING", deletedAt: null, ...scopedByPost } }),
@@ -134,6 +135,7 @@ export async function getDashboardStats() {
     published,
     drafts,
     scheduled,
+    inReview,
     totalViews: totalViews._sum.viewCount ?? 0,
     totalComments,
     pendingComments,
