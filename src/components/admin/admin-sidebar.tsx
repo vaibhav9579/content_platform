@@ -58,13 +58,18 @@ export function AdminSidebar({ role, collapsed = false }: { role: Role; collapse
       aria-hidden={collapsed}
       inert={collapsed || undefined}
       className={cn(
-        "border-border bg-background sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-r transition-[width] duration-200 ease-in-out md:flex",
+        "border-sidebar-border bg-sidebar sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-r transition-[width] duration-200 ease-in-out md:flex",
         collapsed ? "w-0 border-r-0" : "w-64",
       )}
     >
-      <div className="flex h-16 w-64 shrink-0 items-center gap-2 border-b px-5">
-        <Link href="/admin/dashboard" className="font-serif text-base font-semibold tracking-tight">
-          {siteConfig.shortName} CMS
+      <div className="flex h-16 w-64 shrink-0 items-center gap-2.5 border-b px-5">
+        <Link href="/admin/dashboard" className="flex items-center gap-2.5">
+          <span className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
+            {siteConfig.shortName.charAt(0).toUpperCase()}
+          </span>
+          <span className="font-serif text-base font-semibold tracking-tight">
+            {siteConfig.shortName} CMS
+          </span>
         </Link>
       </div>
 
@@ -85,7 +90,7 @@ export function AdminSidebar({ role, collapsed = false }: { role: Role; collapse
                     className={cn(
                       "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                       active
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground shadow-sm"
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                     )}
                   >

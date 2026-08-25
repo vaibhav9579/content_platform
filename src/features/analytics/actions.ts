@@ -55,21 +55,42 @@ export async function getDashboardStats() {
     ]);
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const [recentViews, last24hViews] = await Promise.all([
-    // Excludes bot traffic — these are the numbers shown to humans, not
-    // crawler-activity logs (those stay queryable in the `views` table
-    // directly via isBot=true for anyone auditing SEO crawl coverage).
-    prisma.view.findMany({
-      where: { createdAt: { gte: thirtyDaysAgo }, isBot: false },
-      select: { createdAt: true, visitorId: true },
-    }),
-    prisma.view.findMany({
-      where: { createdAt: { gte: oneDayAgo }, isBot: false },
-      select: { visitorId: true },
-    }),
-  ]);
+  const [recentViews, last24hViews, priorViews, publishedPrior30d, publishedLast30d, subscribersPrior30d, subscribersLast30d] =
+    await Promise.all([
+      // Excludes bot traffic — these are the numbers shown to humans, not
+      // crawler-activity logs (those stay queryable in the `views` table
+      // directly via isBot=true for anyone auditing SEO crawl coverage).
+      prisma.view.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo }, isBot: false },
+        select: { createdAt: true, visitorId: true },
+      }),
+      prisma.view.findMany({
+        where: { createdAt: { gte: oneDayAgo }, isBot: false },
+        select: { visitorId: true },
+      }),
+      // The preceding 30-day window, used only to compute the "vs previous
+      // period" deltas shown on the dashboard stat cards.
+      prisma.view.findMany({
+        where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo }, isBot: false },
+        select: { visitorId: true },
+      }),
+      prisma.post.count({
+        where: { status: PostStatus.PUBLISHED, deletedAt: null, publishedAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+      }),
+      prisma.post.count({
+        where: { status: PostStatus.PUBLISHED, deletedAt: null, publishedAt: { gte: thirtyDaysAgo } },
+      }),
+      prisma.newsletterSubscriber.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
+      prisma.newsletterSubscriber.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+    ]);
+
+  const deltaPct = (current: number, prior: number) => {
+    if (prior === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - prior) / prior) * 100);
+  };
 
   const byDay = new Map<string, { pageViews: number; visitors: Set<string> }>();
   for (const v of recentViews) {
@@ -86,6 +107,9 @@ export async function getDashboardStats() {
     return { date: key, pageViews: bucket?.pageViews ?? 0, uniqueVisitors: bucket?.visitors.size ?? 0 };
   });
 
+  const uniqueVisitors30d = new Set(recentViews.map((v) => v.visitorId)).size;
+  const uniqueVisitorsPrior30d = new Set(priorViews.map((v) => v.visitorId)).size;
+
   return {
     totalPosts,
     published,
@@ -98,8 +122,15 @@ export async function getDashboardStats() {
     topPosts,
     trafficTimeline,
     pageViews30d: recentViews.length,
-    uniqueVisitors30d: new Set(recentViews.map((v) => v.visitorId)).size,
+    uniqueVisitors30d,
     uniqueVisitors24h: new Set(last24hViews.map((v) => v.visitorId)).size,
+    periodLabel: `${thirtyDaysAgo.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+    trends: {
+      pageViews: deltaPct(recentViews.length, priorViews.length),
+      uniqueVisitors: deltaPct(uniqueVisitors30d, uniqueVisitorsPrior30d),
+      published: deltaPct(publishedLast30d, publishedPrior30d),
+      subscribers: deltaPct(subscribersLast30d, subscribersPrior30d),
+    },
   };
 }
 

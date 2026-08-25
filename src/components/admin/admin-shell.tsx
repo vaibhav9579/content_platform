@@ -30,7 +30,7 @@ export function AdminShell({ user, children }: { user: User; children: React.Rea
   }
 
   return (
-    <div className="bg-muted/20 flex h-screen overflow-hidden">
+    <div className="admin-theme bg-muted/20 flex h-screen overflow-hidden">
       <AdminSidebar role={user.role} collapsed={collapsed} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AdminTopbar user={user} sidebarCollapsed={collapsed} onToggleSidebar={toggle} />
