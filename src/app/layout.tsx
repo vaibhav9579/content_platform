@@ -98,7 +98,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         suppressHydrationWarning
         className={`${inter.variable} ${sourceSerif.variable} ${geistMono.variable} h-full antialiased`}
       >
-        <body className="flex min-h-full flex-col">
+        <body className="flex min-h-full flex-col" suppressHydrationWarning>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <a
               href="#main-content"
