@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/auth";
+import { scopeAuthorId } from "@/lib/content/post-authorization";
 import { PostStatus, type Prisma } from "@prisma/client";
 
 const SHARE_NETWORKS = new Set(["x", "linkedin", "facebook", "copy"]);
@@ -19,10 +20,11 @@ export async function getShareBreakdown() {
   const user = await requireStaff();
   if (!user) return [];
 
+  const authorId = scopeAuthorId(user);
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const events = await prisma.shareEvent.groupBy({
     by: ["network"],
-    where: { createdAt: { gte: since } },
+    where: { createdAt: { gte: since }, ...(authorId ? { post: { authorId } } : {}) },
     _count: { _all: true },
   });
 
@@ -36,18 +38,26 @@ export async function getDashboardStats() {
   const user = await requireStaff();
   if (!user) return null;
 
+  // Authors/contributors only ever see figures for their own byline —
+  // undefined (ADMIN/EDITOR) leaves every query site-wide.
+  const authorId = scopeAuthorId(user);
+  const scoped = authorId ? { authorId } : {};
+  const scopedByPost = authorId ? { post: { authorId } } : {};
+
   const [totalPosts, published, drafts, scheduled, totalViews, totalComments, pendingComments, subscribers, topPosts] =
     await Promise.all([
-      prisma.post.count({ where: { deletedAt: null } }),
-      prisma.post.count({ where: { status: PostStatus.PUBLISHED, deletedAt: null } }),
-      prisma.post.count({ where: { status: PostStatus.DRAFT, deletedAt: null } }),
-      prisma.post.count({ where: { status: PostStatus.SCHEDULED, deletedAt: null } }),
-      prisma.post.aggregate({ where: { deletedAt: null }, _sum: { viewCount: true } }),
-      prisma.comment.count({ where: { deletedAt: null } }),
-      prisma.comment.count({ where: { status: "PENDING", deletedAt: null } }),
-      prisma.newsletterSubscriber.count({ where: { status: "ACTIVE" } }),
+      prisma.post.count({ where: { deletedAt: null, ...scoped } }),
+      prisma.post.count({ where: { status: PostStatus.PUBLISHED, deletedAt: null, ...scoped } }),
+      prisma.post.count({ where: { status: PostStatus.DRAFT, deletedAt: null, ...scoped } }),
+      prisma.post.count({ where: { status: PostStatus.SCHEDULED, deletedAt: null, ...scoped } }),
+      prisma.post.aggregate({ where: { deletedAt: null, ...scoped }, _sum: { viewCount: true } }),
+      prisma.comment.count({ where: { deletedAt: null, ...scopedByPost } }),
+      prisma.comment.count({ where: { status: "PENDING", deletedAt: null, ...scopedByPost } }),
+      // Subscribers are a site-wide metric, not attributable to one author —
+      // the dashboard only renders this card for ADMIN/EDITOR.
+      authorId ? Promise.resolve(0) : prisma.newsletterSubscriber.count({ where: { status: "ACTIVE" } }),
       prisma.post.findMany({
-        where: { status: PostStatus.PUBLISHED, deletedAt: null },
+        where: { status: PostStatus.PUBLISHED, deletedAt: null, ...scoped },
         orderBy: { viewCount: "desc" },
         take: 5,
         select: { id: true, title: true, slug: true, viewCount: true, likeCount: true, publishedAt: true },
@@ -64,27 +74,36 @@ export async function getDashboardStats() {
       // crawler-activity logs (those stay queryable in the `views` table
       // directly via isBot=true for anyone auditing SEO crawl coverage).
       prisma.view.findMany({
-        where: { createdAt: { gte: thirtyDaysAgo }, isBot: false },
+        where: { createdAt: { gte: thirtyDaysAgo }, isBot: false, ...scopedByPost },
         select: { createdAt: true, visitorId: true },
       }),
       prisma.view.findMany({
-        where: { createdAt: { gte: oneDayAgo }, isBot: false },
+        where: { createdAt: { gte: oneDayAgo }, isBot: false, ...scopedByPost },
         select: { visitorId: true },
       }),
       // The preceding 30-day window, used only to compute the "vs previous
       // period" deltas shown on the dashboard stat cards.
       prisma.view.findMany({
-        where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo }, isBot: false },
+        where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo }, isBot: false, ...scopedByPost },
         select: { visitorId: true },
       }),
       prisma.post.count({
-        where: { status: PostStatus.PUBLISHED, deletedAt: null, publishedAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+        where: {
+          status: PostStatus.PUBLISHED,
+          deletedAt: null,
+          publishedAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+          ...scoped,
+        },
       }),
       prisma.post.count({
-        where: { status: PostStatus.PUBLISHED, deletedAt: null, publishedAt: { gte: thirtyDaysAgo } },
+        where: { status: PostStatus.PUBLISHED, deletedAt: null, publishedAt: { gte: thirtyDaysAgo }, ...scoped },
       }),
-      prisma.newsletterSubscriber.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
-      prisma.newsletterSubscriber.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      authorId
+        ? Promise.resolve(0)
+        : prisma.newsletterSubscriber.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
+      authorId
+        ? Promise.resolve(0)
+        : prisma.newsletterSubscriber.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
     ]);
 
   const deltaPct = (current: number, prior: number) => {
@@ -140,10 +159,11 @@ export async function getTopPostsBy(sort: AnalyticsSort, take = 10) {
   const user = await requireStaff();
   if (!user) return [];
 
+  const authorId = scopeAuthorId(user);
   const orderBy: Prisma.PostOrderByWithRelationInput = { [sort]: "desc" };
 
   return prisma.post.findMany({
-    where: { status: PostStatus.PUBLISHED, deletedAt: null },
+    where: { status: PostStatus.PUBLISHED, deletedAt: null, ...(authorId ? { authorId } : {}) },
     orderBy,
     take,
     select: {
@@ -165,9 +185,10 @@ export async function getReferrerBreakdown() {
   const user = await requireStaff();
   if (!user) return [];
 
+  const authorId = scopeAuthorId(user);
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const views = await prisma.view.findMany({
-    where: { createdAt: { gte: since }, isBot: false },
+    where: { createdAt: { gte: since }, isBot: false, ...(authorId ? { post: { authorId } } : {}) },
     select: { referrer: true },
   });
 

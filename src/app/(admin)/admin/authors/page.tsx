@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
+import { requireStaff, canManageAllPosts } from "@/lib/auth";
 import { getAuthors } from "@/features/authors/actions";
 import { AuthorManager } from "@/components/admin/authors/author-manager";
 
 export const metadata: Metadata = { title: "Authors" };
 
 export default async function AdminAuthorsPage({ searchParams }: PageProps<"/admin/authors">) {
+  const user = await requireStaff();
+  if (!user || !canManageAllPosts(user.role)) redirect("/admin/dashboard");
+
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const { authors, totalCount, totalPages, pageSize } = await getAuthors(page);

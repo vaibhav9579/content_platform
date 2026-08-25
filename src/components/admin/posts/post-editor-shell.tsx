@@ -137,11 +137,14 @@ export function PostEditorShell({
   post,
   formData,
   revisions = [],
+  allowPublish = true,
 }: {
   mode: "create" | "edit";
   post?: ExistingPost;
   formData: FormData;
   revisions?: Revision;
+  /** Authors/contributors can't publish directly — they submit for editorial review instead. */
+  allowPublish?: boolean;
 }) {
   const router = useRouter();
   const editorRef = React.useRef<TiptapEditorHandle>(null);
@@ -574,8 +577,12 @@ export function PostEditorShell({
                 <SelectContent>
                   <SelectItem value={PostStatus.DRAFT}>Draft</SelectItem>
                   <SelectItem value={PostStatus.IN_REVIEW}>In Review</SelectItem>
-                  <SelectItem value={PostStatus.SCHEDULED}>Scheduled</SelectItem>
-                  <SelectItem value={PostStatus.PUBLISHED}>Published</SelectItem>
+                  <SelectItem value={PostStatus.SCHEDULED} disabled={!allowPublish}>
+                    Scheduled
+                  </SelectItem>
+                  <SelectItem value={PostStatus.PUBLISHED} disabled={!allowPublish}>
+                    Published
+                  </SelectItem>
                   <SelectItem value={PostStatus.ARCHIVED}>Archived</SelectItem>
                 </SelectContent>
               </Select>
@@ -595,14 +602,27 @@ export function PostEditorShell({
               <Button className="flex-1" disabled={pending} onClick={() => handleSave()}>
                 {pending && <Loader2Icon className="animate-spin" />} Save
               </Button>
-              <Button
-                variant="secondary"
-                className="flex-1"
-                disabled={pending}
-                onClick={handlePublishClick}
-              >
-                Publish
-              </Button>
+              {allowPublish ? (
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  disabled={pending}
+                  onClick={handlePublishClick}
+                >
+                  Publish
+                </Button>
+              ) : (
+                status !== PostStatus.PUBLISHED && (
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    disabled={pending}
+                    onClick={() => handleSave(PostStatus.IN_REVIEW)}
+                  >
+                    Submit for Review
+                  </Button>
+                )
+              )}
             </div>
             {postId && (
               <Button variant="outline" size="sm" className="w-full" asChild>

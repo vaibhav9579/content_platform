@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { AlertTriangleIcon, CheckCircle2Icon } from "lucide-react";
 
+import { requireStaff, canManageAllPosts } from "@/lib/auth";
 import { getSeoHealthReport, type SeoIssue } from "@/features/posts/queries/get-seo-health";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +23,9 @@ const ISSUE_LABELS: Record<SeoIssue, string> = {
 };
 
 export default async function AdminSeoPage() {
+  const user = await requireStaff();
+  if (!user || !canManageAllPosts(user.role)) redirect("/admin/dashboard");
+
   const report = await getSeoHealthReport();
   const healthPercent = report.totalPosts
     ? Math.round((report.healthyCount / report.totalPosts) * 100)

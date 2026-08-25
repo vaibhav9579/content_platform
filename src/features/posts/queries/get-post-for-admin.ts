@@ -9,9 +9,18 @@ export async function getPostForAdmin(id: string) {
   });
 }
 
-export async function getEditorFormData() {
+/**
+ * `restrictToAuthorId` locks the author dropdown to a single option — used
+ * for AUTHOR/CONTRIBUTOR writers, who can only ever post under their own
+ * byline. ADMIN/EDITOR get the full author list to attribute posts freely.
+ */
+export async function getEditorFormData(restrictToAuthorId?: string) {
   const [authors, categories, tags] = await Promise.all([
-    prisma.author.findMany({ select: { id: true, name: true, avatarUrl: true }, orderBy: { name: "asc" } }),
+    prisma.author.findMany({
+      select: { id: true, name: true, avatarUrl: true },
+      where: restrictToAuthorId ? { id: restrictToAuthorId } : undefined,
+      orderBy: { name: "asc" },
+    }),
     prisma.category.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.tag.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);

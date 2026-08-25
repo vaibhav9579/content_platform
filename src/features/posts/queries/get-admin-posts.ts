@@ -21,11 +21,14 @@ const adminListSelect = {
 
 const PAGE_SIZE = 20;
 
-export async function getAdminPosts(opts: { status?: PostStatus; search?: string; page?: number } = {}) {
+export async function getAdminPosts(
+  opts: { status?: PostStatus; search?: string; page?: number; authorId?: string } = {},
+) {
   const page = Math.max(1, opts.page ?? 1);
   const where: Prisma.PostWhereInput = {
     deletedAt: null,
     ...(opts.status ? { status: opts.status } : {}),
+    ...(opts.authorId ? { authorId: opts.authorId } : {}),
     ...(opts.search
       ? { title: { contains: opts.search, mode: "insensitive" as const } }
       : {}),
@@ -44,9 +47,12 @@ export async function getAdminPosts(opts: { status?: PostStatus; search?: string
   return { posts, totalCount, page, pageSize: PAGE_SIZE, totalPages: Math.max(1, Math.ceil(totalCount / PAGE_SIZE)) };
 }
 
-export async function getTrashedPosts(page = 1) {
+export async function getTrashedPosts(page = 1, authorId?: string) {
   const currentPage = Math.max(1, page);
-  const where: Prisma.PostWhereInput = { deletedAt: { not: null } };
+  const where: Prisma.PostWhereInput = {
+    deletedAt: { not: null },
+    ...(authorId ? { authorId } : {}),
+  };
   const [posts, totalCount] = await Promise.all([
     prisma.post.findMany({
       where,
@@ -66,13 +72,17 @@ export async function getTrashedPosts(page = 1) {
   };
 }
 
-export async function getPostStatusCounts(): Promise<Partial<Record<PostStatus, number>> & { TRASH: number }> {
+export async function getPostStatusCounts(
+  authorId?: string,
+): Promise<Partial<Record<PostStatus, number>> & { TRASH: number }> {
   const counts = await prisma.post.groupBy({
     by: ["status"],
-    where: { deletedAt: null },
+    where: { deletedAt: null, ...(authorId ? { authorId } : {}) },
     _count: true,
   });
-  const trashed = await prisma.post.count({ where: { deletedAt: { not: null } } });
+  const trashed = await prisma.post.count({
+    where: { deletedAt: { not: null }, ...(authorId ? { authorId } : {}) },
+  });
   return {
     ...(Object.fromEntries(counts.map((c) => [c.status, c._count])) as Partial<Record<PostStatus, number>>),
     TRASH: trashed,

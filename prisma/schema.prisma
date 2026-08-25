@@ -71,6 +71,19 @@ enum MediaType {
 // Users & Authors
 // ----------------------------------------------------------------------------
 
+/// A role an admin has pre-assigned to an email address that hasn't signed
+/// in yet. Consumed (and deleted) the moment that person's User row is
+/// first created via Clerk — see getCurrentDbUser.
+model TeamInvite {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  role           Role
+  invitedByEmail String?
+  createdAt      DateTime @default(now())
+
+  @@map("team_invites")
+}
+
 /// Mirrors Clerk users. clerkId is the source of truth for auth.
 model User {
   id        String   @id @default(cuid())

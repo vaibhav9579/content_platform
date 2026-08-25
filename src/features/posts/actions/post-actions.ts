@@ -4,13 +4,14 @@ import { revalidatePath } from "next/cache";
 import { Prisma, PostStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { requireStaff, canPublish, canManageSettings } from "@/lib/auth";
+import { requireStaff, canPublish, canManageSettings, canManageAllPosts } from "@/lib/auth";
 import { getAdminPosts, getTrashedPosts } from "@/features/posts/queries/get-admin-posts";
 import { postInputSchema, type PostInput } from "@/lib/validations";
 import { ensureUniqueSlug } from "@/lib/content/slug";
 import { computeExcerpt, computeMetaDescription, computeReadingStats } from "@/lib/content/reading-time";
 import { addHeadingIds } from "@/lib/content/toc";
 import { sectionForField } from "@/lib/content/post-error-section";
+import { ownsPost, scopeAuthorId } from "@/lib/content/post-authorization";
 import { sendNewPostNotification } from "@/features/newsletter/actions";
 import { pingIndexNow } from "@/lib/seo/indexnow";
 import { buildPrefixTsQuery } from "@/lib/search/full-text-query";
@@ -40,8 +41,25 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
   }
   const input = parsed.data;
 
-  if (input.status === PostStatus.PUBLISHED && !canPublish(user.role)) {
-    return { success: false, error: "Only editors and admins can publish posts." };
+  if ((input.status === PostStatus.PUBLISHED || input.status === PostStatus.SCHEDULED) && !canPublish(user.role)) {
+    return { success: false, error: "Only editors and admins can publish or schedule posts." };
+  }
+
+  let authorId = input.authorId;
+  if (!canManageAllPosts(user.role)) {
+    // Authors/contributors can only ever write under their own byline —
+    // ignore whatever authorId the client sent and pin it to their own.
+    if (!user.author) {
+      return { success: false, error: "Your author profile isn't set up yet — ask an admin to check your account." };
+    }
+    authorId = user.author.id;
+
+    if (input.id) {
+      const existing = await prisma.post.findUnique({ where: { id: input.id }, select: { authorId: true } });
+      if (existing && existing.authorId !== user.author.id) {
+        return { success: false, error: "You can only edit your own posts." };
+      }
+    }
   }
 
   try {
@@ -103,7 +121,7 @@ export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: 
       isFeatured: input.isFeatured,
       isPinned: input.isPinned,
       allowComments: input.allowComments,
-      authorId: input.authorId,
+      authorId,
       categoryId: input.categoryId || null,
     };
 
@@ -180,6 +198,13 @@ export async function autosavePost(id: string, contentJson: unknown, contentHtml
   const user = await requireStaff();
   if (!user) return { success: false as const, error: "Unauthorized" };
 
+  if (!canManageAllPosts(user.role)) {
+    const existing = await prisma.post.findUnique({ where: { id }, select: { authorId: true } });
+    if (!existing || existing.authorId !== user.author?.id) {
+      return { success: false as const, error: "You can only edit your own posts." };
+    }
+  }
+
   try {
     const readingStats = computeReadingStats(contentHtml);
     await prisma.post.update({
@@ -203,8 +228,9 @@ export async function deletePost(id: string): Promise<ActionResult> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
 
-  const post = await prisma.post.findUnique({ where: { id }, select: { slug: true } });
+  const post = await prisma.post.findUnique({ where: { id }, select: { slug: true, authorId: true } });
   if (!post) return { success: false, error: "Post not found" };
+  if (!ownsPost(user, post)) return { success: false, error: "You can only delete your own posts." };
 
   await prisma.$transaction([
     prisma.post.update({ where: { id }, data: { deletedAt: new Date() } }),
@@ -221,6 +247,10 @@ export async function deletePost(id: string): Promise<ActionResult> {
 export async function restorePost(id: string): Promise<ActionResult<{ slug: string }>> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
+
+  const existing = await prisma.post.findUnique({ where: { id }, select: { authorId: true } });
+  if (!existing) return { success: false, error: "Post not found" };
+  if (!ownsPost(user, existing)) return { success: false, error: "You can only restore your own posts." };
 
   const post = await prisma.post.update({ where: { id }, data: { deletedAt: null } });
   revalidatePublicPost(post.slug);
@@ -247,7 +277,7 @@ export async function permanentlyDeletePost(id: string): Promise<ActionResult> {
 export async function listTrashedPostsForAdmin(page?: number) {
   const user = await requireStaff();
   if (!user) return { posts: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 1 };
-  return getTrashedPosts(page);
+  return getTrashedPosts(page, scopeAuthorId(user));
 }
 
 export async function duplicatePost(id: string): Promise<ActionResult<{ id: string }>> {
@@ -256,6 +286,7 @@ export async function duplicatePost(id: string): Promise<ActionResult<{ id: stri
 
   const original = await prisma.post.findUnique({ where: { id }, include: { tags: true } });
   if (!original) return { success: false, error: "Post not found" };
+  if (!ownsPost(user, original)) return { success: false, error: "You can only duplicate your own posts." };
 
   const slug = await ensureUniqueSlug(`${original.slug}-copy`, async (candidate) => {
     const existing = await prisma.post.findUnique({ where: { slug: candidate } });
@@ -303,8 +334,10 @@ export async function updatePostStatus(
     return { success: false, error: "Only editors and admins can publish posts." };
   }
 
-  const existing = await prisma.post.findUnique({ where: { id }, select: { publishedAt: true } });
-  const isFirstPublish = status === PostStatus.PUBLISHED && !existing?.publishedAt;
+  const existing = await prisma.post.findUnique({ where: { id }, select: { publishedAt: true, authorId: true } });
+  if (!existing) return { success: false, error: "Post not found" };
+  if (!ownsPost(user, existing)) return { success: false, error: "You can only manage your own posts." };
+  const isFirstPublish = status === PostStatus.PUBLISHED && !existing.publishedAt;
 
   const post = await prisma.post.update({
     where: { id },
@@ -336,6 +369,7 @@ export async function restoreRevision(revisionId: string): Promise<ActionResult<
 
   const revision = await prisma.postRevision.findUnique({ where: { id: revisionId }, include: { post: true } });
   if (!revision) return { success: false, error: "Revision not found" };
+  if (!ownsPost(user, revision.post)) return { success: false, error: "You can only manage your own posts." };
 
   const post = await prisma.post.update({
     where: { id: revision.postId },
@@ -381,7 +415,7 @@ export async function publishDuePosts() {
 export async function listPostsForAdmin(status?: PostStatus, search?: string, page?: number) {
   const user = await requireStaff();
   if (!user) return { posts: [], totalCount: 0, page: 1, pageSize: 20, totalPages: 1 };
-  return getAdminPosts({ status, search, page });
+  return getAdminPosts({ status, search, page, authorId: scopeAuthorId(user) });
 }
 
 /** Exact, case-insensitive title match — a lightweight nudge, not a hard block, before publishing. */

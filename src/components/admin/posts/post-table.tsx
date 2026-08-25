@@ -52,12 +52,15 @@ export function PostTable({
   initialTotalCount,
   initialTotalPages,
   pageSize,
+  canPublish = true,
 }: {
   initialPosts: Post[];
   counts: Partial<Record<PostStatus, number>> & { TRASH?: number };
   initialTotalCount: number;
   initialTotalPages: number;
   pageSize: number;
+  /** Whether the viewer may publish directly — authors/contributors submit for review instead. */
+  canPublish?: boolean;
 }) {
   const [tab, setTab] = React.useState<TabValue>("ALL");
   const [search, setSearch] = React.useState("");
@@ -255,7 +258,7 @@ export function PostTable({
                             </Link>
                           </Button>
                         )}
-                        {post.status !== "PUBLISHED" && (
+                        {post.status !== "PUBLISHED" && canPublish && (
                           <Button
                             variant="ghost"
                             size="icon"

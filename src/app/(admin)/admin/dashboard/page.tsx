@@ -13,6 +13,9 @@ import {
   CalendarIcon,
 } from "lucide-react";
 
+import { redirect } from "next/navigation";
+
+import { requireStaff, canManageAllPosts } from "@/lib/auth";
 import { getDashboardStats } from "@/features/analytics/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrafficChart } from "@/components/admin/traffic-chart";
@@ -66,23 +69,35 @@ const statCards = [
 ] as const;
 
 export default async function AdminDashboardPage() {
+  const user = await requireStaff();
+  if (!user) redirect("/sign-in?redirect_url=/admin/dashboard");
+
   const stats = await getDashboardStats();
   if (!stats) return null;
+
+  // Subscribers are a site-wide metric, not attributable to one author —
+  // only shown to ADMIN/EDITOR, who see everyone's numbers.
+  const oversight = canManageAllPosts(user.role);
+  const visibleCards = oversight ? statCards : statCards.filter((c) => c.key !== "subscribers");
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground text-sm">An overview of your publication&apos;s performance.</p>
+          <p className="text-muted-foreground text-sm">
+            {oversight
+              ? "An overview of your publication's performance."
+              : "An overview of your posts' performance."}
+          </p>
         </div>
         <Badge variant="outline" className="text-muted-foreground gap-1.5 py-1.5">
           <CalendarIcon className="size-3.5" /> Last 30 days
         </Badge>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        {statCards.map((card) => {
+      <div className={cn("grid grid-cols-2 gap-4", oversight ? "lg:grid-cols-5" : "lg:grid-cols-4")}>
+        {visibleCards.map((card) => {
           const trend = card.trendKey ? stats.trends[card.trendKey] : null;
           return (
             <Card key={card.key} className={cn("overflow-hidden border-0 bg-gradient-to-b shadow-sm", card.tint)}>

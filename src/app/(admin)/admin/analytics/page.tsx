@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { requireStaff, canManageAllPosts } from "@/lib/auth";
 import { getTopPostsBy, getReferrerBreakdown, getShareBreakdown } from "@/features/analytics/actions";
 import { AnalyticsExplorer } from "@/components/admin/analytics/analytics-explorer";
 import { ReferrerChart } from "@/components/admin/analytics/referrer-chart";
@@ -8,6 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export const metadata: Metadata = { title: "Analytics" };
 
 export default async function AdminAnalyticsPage() {
+  const user = await requireStaff();
+  const oversight = canManageAllPosts(user?.role);
+
   const [posts, referrers, shares] = await Promise.all([
     getTopPostsBy("viewCount"),
     getReferrerBreakdown(),
@@ -18,7 +22,9 @@ export default async function AdminAnalyticsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
-        <p className="text-muted-foreground text-sm">Engagement breakdown across your entire catalog.</p>
+        <p className="text-muted-foreground text-sm">
+          {oversight ? "Engagement breakdown across your entire catalog." : "Engagement breakdown for your own posts."}
+        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

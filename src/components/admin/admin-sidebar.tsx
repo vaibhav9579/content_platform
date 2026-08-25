@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Role } from "@prisma/client";
+import { Role } from "@prisma/client";
 import {
   LayoutDashboardIcon,
   FileTextIcon,
@@ -16,10 +16,17 @@ import {
   SettingsIcon,
   BarChart3Icon,
   ExternalLinkIcon,
+  UserCogIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/config/site";
+
+// Oversight-only sections (taxonomy management, newsletter, SEO) are hidden
+// from AUTHOR/CONTRIBUTOR — they only manage their own posts. `roles`
+// omitted means every staff role can see the item.
+const EDITORIAL: Role[] = [Role.ADMIN, Role.EDITOR];
+const ADMIN_ONLY: Role[] = [Role.ADMIN];
 
 const NAV = [
   { section: "Overview", items: [{ href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboardIcon }] },
@@ -27,9 +34,9 @@ const NAV = [
     section: "Content",
     items: [
       { href: "/admin/posts", label: "Posts", icon: FileTextIcon },
-      { href: "/admin/categories", label: "Categories", icon: FolderTreeIcon },
-      { href: "/admin/tags", label: "Tags", icon: TagIcon },
-      { href: "/admin/authors", label: "Authors", icon: UsersIcon },
+      { href: "/admin/categories", label: "Categories", icon: FolderTreeIcon, roles: EDITORIAL },
+      { href: "/admin/tags", label: "Tags", icon: TagIcon, roles: EDITORIAL },
+      { href: "/admin/authors", label: "Authors", icon: UsersIcon, roles: EDITORIAL },
       { href: "/admin/media", label: "Media Library", icon: ImageIcon },
     ],
   },
@@ -37,21 +44,26 @@ const NAV = [
     section: "Engagement",
     items: [
       { href: "/admin/comments", label: "Comments", icon: MessageSquareIcon },
-      { href: "/admin/newsletter", label: "Newsletter", icon: MailIcon },
+      { href: "/admin/newsletter", label: "Newsletter", icon: MailIcon, roles: EDITORIAL },
       { href: "/admin/analytics", label: "Analytics", icon: BarChart3Icon },
     ],
   },
   {
     section: "System",
     items: [
-      { href: "/admin/seo", label: "SEO Dashboard", icon: SearchIcon },
-      { href: "/admin/settings", label: "Settings", icon: SettingsIcon },
+      { href: "/admin/seo", label: "SEO Dashboard", icon: SearchIcon, roles: EDITORIAL },
+      { href: "/admin/team", label: "Team", icon: UserCogIcon, roles: ADMIN_ONLY },
+      { href: "/admin/settings", label: "Settings", icon: SettingsIcon, roles: ADMIN_ONLY },
     ],
   },
 ];
 
 export function AdminSidebar({ role, collapsed = false }: { role: Role; collapsed?: boolean }) {
   const pathname = usePathname();
+  const nav = NAV.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !("roles" in item) || item.roles?.includes(role)),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <aside
@@ -74,7 +86,7 @@ export function AdminSidebar({ role, collapsed = false }: { role: Role; collapse
       </div>
 
       <nav className="w-64 flex-1 space-y-6 overflow-y-auto px-3 py-5">
-        {NAV.map((group) => (
+        {nav.map((group) => (
           <div key={group.section}>
             <p className="text-muted-foreground px-3 pb-1.5 text-[11px] font-semibold tracking-wide uppercase">
               {group.section}

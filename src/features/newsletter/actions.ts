@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
-import { requireStaff } from "@/lib/auth";
+import { requireStaff, canManageAllPosts } from "@/lib/auth";
 import { newsletterSubscribeSchema, type NewsletterSubscribeInput } from "@/lib/validations";
 import { SubscriberStatus } from "@prisma/client";
 import { newsletterRateLimit, getRequestIdentifier } from "@/lib/rate-limit";
@@ -66,7 +66,9 @@ const PAGE_SIZE = 20;
 
 export async function getSubscribers(status?: SubscriberStatus, page = 1) {
   const user = await requireStaff();
-  if (!user) return { subscribers: [], totalCount: 0, activeCount: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 };
+  if (!user || !canManageAllPosts(user.role)) {
+    return { subscribers: [], totalCount: 0, activeCount: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 };
+  }
 
   const currentPage = Math.max(1, page);
   const where = status ? { status } : undefined;
@@ -93,7 +95,7 @@ export async function getSubscribers(status?: SubscriberStatus, page = 1) {
 /** Unpaginated — backs the "Export CSV" button, which needs every row regardless of the table's current page. */
 export async function getAllSubscribersForExport() {
   const user = await requireStaff();
-  if (!user) return [];
+  if (!user || !canManageAllPosts(user.role)) return [];
 
   return prisma.newsletterSubscriber.findMany({
     orderBy: { createdAt: "desc" },
@@ -104,6 +106,7 @@ export async function getAllSubscribersForExport() {
 export async function deleteSubscriber(id: string): Promise<ActionResult> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
+  if (!canManageAllPosts(user.role)) return { success: false, error: "Only editors and admins can manage subscribers." };
 
   await prisma.newsletterSubscriber.delete({ where: { id } });
   revalidatePath("/admin/newsletter");

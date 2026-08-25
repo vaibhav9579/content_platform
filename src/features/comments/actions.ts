@@ -6,6 +6,7 @@ import { CommentStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentDbUser, requireStaff } from "@/lib/auth";
+import { ownsPost, scopeAuthorId } from "@/lib/content/post-authorization";
 import { commentInputSchema, type CommentInput } from "@/lib/validations";
 import { commentRateLimit, getRequestIdentifier } from "@/lib/rate-limit";
 
@@ -68,6 +69,10 @@ export async function moderateComment(
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
 
+  const existing = await prisma.comment.findUnique({ where: { id }, select: { post: { select: { authorId: true } } } });
+  if (!existing) return { success: false, error: "Comment not found" };
+  if (!ownsPost(user, existing.post)) return { success: false, error: "You can only moderate comments on your own posts." };
+
   const comment = await prisma.comment.update({
     where: { id },
     data: { status },
@@ -84,6 +89,10 @@ export async function deleteComment(id: string): Promise<ActionResult> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
 
+  const existing = await prisma.comment.findUnique({ where: { id }, select: { post: { select: { authorId: true } } } });
+  if (!existing) return { success: false, error: "Comment not found" };
+  if (!ownsPost(user, existing.post)) return { success: false, error: "You can only moderate comments on your own posts." };
+
   const comment = await prisma.comment.update({
     where: { id },
     data: { deletedAt: new Date() },
@@ -97,6 +106,10 @@ export async function deleteComment(id: string): Promise<ActionResult> {
 export async function restoreComment(id: string): Promise<ActionResult> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
+
+  const existing = await prisma.comment.findUnique({ where: { id }, select: { post: { select: { authorId: true } } } });
+  if (!existing) return { success: false, error: "Comment not found" };
+  if (!ownsPost(user, existing.post)) return { success: false, error: "You can only moderate comments on your own posts." };
 
   const comment = await prisma.comment.update({
     where: { id },
@@ -113,10 +126,14 @@ export async function permanentlyDeleteComment(id: string): Promise<ActionResult
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
 
-  const comment = await prisma.comment.findUnique({ where: { id }, select: { deletedAt: true } });
+  const comment = await prisma.comment.findUnique({
+    where: { id },
+    select: { deletedAt: true, post: { select: { authorId: true } } },
+  });
   if (!comment?.deletedAt) {
     return { success: false, error: "Move the comment to trash before deleting it permanently." };
   }
+  if (!ownsPost(user, comment.post)) return { success: false, error: "You can only moderate comments on your own posts." };
 
   await prisma.comment.delete({ where: { id } });
   revalidatePath("/admin/comments");
@@ -129,10 +146,12 @@ export async function getAllComments(opts: { status?: CommentStatus; trashed?: b
   const user = await requireStaff();
   if (!user) return { comments: [], totalCount: 0, page: 1, pageSize: PAGE_SIZE, totalPages: 1 };
 
+  const authorId = scopeAuthorId(user);
   const page = Math.max(1, opts.page ?? 1);
   const where = {
     deletedAt: opts.trashed ? { not: null } : null,
     ...(opts.status ? { status: opts.status } : {}),
+    ...(authorId ? { post: { authorId } } : {}),
   };
   const [comments, totalCount] = await Promise.all([
     prisma.comment.findMany({

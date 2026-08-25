@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
+import { requireStaff, canManageAllPosts } from "@/lib/auth";
 import { getSubscribers } from "@/features/newsletter/actions";
 import { SubscriberTable } from "@/components/admin/newsletter/subscriber-table";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 export const metadata: Metadata = { title: "Newsletter" };
 
 export default async function AdminNewsletterPage({ searchParams }: PageProps<"/admin/newsletter">) {
+  const user = await requireStaff();
+  if (!user || !canManageAllPosts(user.role)) redirect("/admin/dashboard");
+
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
   const { subscribers, totalCount, activeCount, totalPages, pageSize } = await getSubscribers(undefined, page);

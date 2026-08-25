@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
-import { requireStaff } from "@/lib/auth";
+import { requireStaff, canManageAllPosts } from "@/lib/auth";
 import { tagInputSchema, type TagInput } from "@/lib/validations";
 import { ensureUniqueSlug } from "@/lib/content/slug";
 
@@ -28,6 +28,7 @@ export async function getTags(page = 1) {
 export async function saveTag(raw: TagInput): Promise<ActionResult<{ id: string }>> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
+  if (!canManageAllPosts(user.role)) return { success: false, error: "Only editors and admins can manage tags." };
 
   const parsed = tagInputSchema.safeParse(raw);
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
@@ -55,6 +56,7 @@ export async function saveTag(raw: TagInput): Promise<ActionResult<{ id: string 
 export async function deleteTag(id: string): Promise<ActionResult> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
+  if (!canManageAllPosts(user.role)) return { success: false, error: "Only editors and admins can manage tags." };
 
   await prisma.tag.delete({ where: { id } });
   revalidatePath("/admin/tags");

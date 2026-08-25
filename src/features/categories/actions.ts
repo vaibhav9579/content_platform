@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
-import { requireStaff } from "@/lib/auth";
+import { requireStaff, canManageAllPosts } from "@/lib/auth";
 import { categoryInputSchema, type CategoryInput } from "@/lib/validations";
 import { ensureUniqueSlug } from "@/lib/content/slug";
 
@@ -41,6 +41,7 @@ export async function getCategories(page = 1) {
 export async function saveCategory(raw: CategoryInput): Promise<ActionResult<{ id: string }>> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
+  if (!canManageAllPosts(user.role)) return { success: false, error: "Only editors and admins can manage categories." };
 
   const parsed = categoryInputSchema.safeParse(raw);
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
@@ -82,6 +83,7 @@ export async function saveCategory(raw: CategoryInput): Promise<ActionResult<{ i
 export async function deleteCategory(id: string): Promise<ActionResult> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
+  if (!canManageAllPosts(user.role)) return { success: false, error: "Only editors and admins can manage categories." };
 
   // Children are automatically detached (parentId -> null) via the schema's onDelete: SetNull.
   await prisma.category.delete({ where: { id } });

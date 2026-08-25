@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DifficultyLevel, PostStatus } from "@prisma/client";
+import { DifficultyLevel, PostStatus, Role } from "@prisma/client";
 
 export const faqItemSchema = z.object({
   question: z.string().min(1, "FAQ question can't be empty").max(300, "FAQ question is too long (max 300 characters)"),
@@ -101,6 +101,14 @@ export const authorInputSchema = z.object({
   featured: z.boolean().default(false),
 });
 export type AuthorInput = z.infer<typeof authorInputSchema>;
+
+export const teamInviteInputSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+  role: z.enum([Role.ADMIN, Role.EDITOR, Role.AUTHOR, Role.CONTRIBUTOR], {
+    message: "Choose a role",
+  }),
+});
+export type TeamInviteInput = z.infer<typeof teamInviteInputSchema>;
 
 export const commentInputSchema = z.object({
   postId: z.string().cuid(),
