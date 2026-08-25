@@ -168,10 +168,10 @@ export default async function AdminDashboardPage() {
             <StatusDonut
               total={stats.published + stats.drafts + stats.inReview + stats.scheduled}
               slices={[
-                { label: "Published", value: stats.published, color: "var(--color-primary)" },
-                { label: "Drafts", value: stats.drafts, color: "var(--color-chart-2)" },
-                { label: "In Review", value: stats.inReview, color: "var(--color-warning)" },
-                { label: "Scheduled", value: stats.scheduled, color: "var(--color-chart-4)" },
+                { label: "Published", value: stats.published, color: "var(--primary)" },
+                { label: "Drafts", value: stats.drafts, color: "var(--chart-2)" },
+                { label: "In Review", value: stats.inReview, color: "var(--warning)" },
+                { label: "Scheduled", value: stats.scheduled, color: "var(--chart-4)" },
               ]}
             />
             <div className="space-y-2.5">
