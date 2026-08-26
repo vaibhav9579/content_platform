@@ -127,7 +127,14 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
           ]}
         />
 
-        <div className="mt-6 grid gap-10 lg:grid-cols-[1fr_240px]">
+        <div className="mt-6 grid gap-10 lg:grid-cols-[240px_1fr]">
+          <aside className="hidden lg:block">
+            <div className="sticky top-24 space-y-8">
+              <TableOfContents items={toc} />
+              <RecentlyViewed excludeSlug={post.slug} />
+            </div>
+          </aside>
+
           <div className="min-w-0">
             <header className="mx-auto max-w-3xl">
               {post.category && (
@@ -206,13 +213,6 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
               />
             </div>
           </div>
-
-          <aside className="hidden lg:block">
-            <div className="sticky top-24 space-y-8">
-              <TableOfContents items={toc} />
-              <RecentlyViewed excludeSlug={post.slug} />
-            </div>
-          </aside>
         </div>
       </div>
 
