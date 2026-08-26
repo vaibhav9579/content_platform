@@ -24,6 +24,7 @@ import { BookmarkButton } from "@/components/blog/bookmark-button";
 import { SummaryBlock, KeyTakeaways, FaqSection, SourcesSection } from "@/components/blog/geo-blocks";
 import { AuthorBioCard } from "@/components/blog/author-bio-card";
 import { RelatedArticles } from "@/components/blog/related-articles";
+import { RelatedArticlesRail } from "@/components/blog/related-articles-rail";
 import { PrevNextNav } from "@/components/blog/prev-next-nav";
 import { CommentsSection } from "@/components/blog/comments-section";
 import { RecentlyViewed } from "@/components/blog/recently-viewed";
@@ -127,7 +128,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
           ]}
         />
 
-        <div className="mt-6 grid gap-10 lg:grid-cols-[240px_1fr]">
+        <div className="mt-6 grid gap-10 lg:grid-cols-[240px_1fr] xl:grid-cols-[240px_1fr_260px]">
           <aside className="hidden lg:block">
             <div className="sticky top-24 space-y-8">
               <TableOfContents items={toc} />
@@ -213,6 +214,12 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
               />
             </div>
           </div>
+
+          <aside className="hidden xl:block">
+            <div className="sticky top-24">
+              <RelatedArticlesRail posts={related} />
+            </div>
+          </aside>
         </div>
       </div>
 
