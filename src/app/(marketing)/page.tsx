@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import { FlameIcon } from "lucide-react";
 
 import { getHomepageData } from "@/features/posts/queries/get-homepage-data";
+import { getActiveBanners } from "@/features/banners/actions";
 import { HeroSection } from "@/components/blog/home/hero-section";
+import { BannerCarousel } from "@/components/blog/home/banner-carousel";
 import { PopularCategories } from "@/components/blog/home/popular-categories";
 import { Testimonials } from "@/components/blog/home/testimonials";
 import { NewsletterCta } from "@/components/blog/home/newsletter-cta";
@@ -20,12 +22,15 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const { featured, trending, latest, editorsPick, popularCategories } = await getHomepageData();
+  const [{ featured, trending, latest, editorsPick, popularCategories }, banners] = await Promise.all([
+    getHomepageData(),
+    getActiveBanners(),
+  ]);
   const heroPosts = featured.length >= 3 ? featured : latest.slice(0, 5);
 
   return (
     <>
-      <HeroSection posts={heroPosts} />
+      {banners.length > 0 ? <BannerCarousel banners={banners} /> : <HeroSection posts={heroPosts} />}
 
       {editorsPick.length > 0 && (
         <section className="container-wide py-12">

@@ -146,3 +146,23 @@ export const siteSettingsSchema = z.object({
   bingSiteVerification: z.string().max(200).optional().nullable(),
 });
 export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;
+
+export const bannerInputSchema = z
+  .object({
+    id: z.string().cuid().optional(),
+    title: z.string().max(120, "Title is too long (max 120 characters)").optional().nullable(),
+    subtitle: z.string().max(200, "Subtitle is too long (max 200 characters)").optional().nullable(),
+    imageUrl: z.string().url("Upload a banner image"),
+    imageAlt: z.string().max(200).optional().nullable(),
+    linkUrl: z.string().max(500, "Link is too long").optional().nullable(),
+    ctaLabel: z.string().max(40, "Button label is too long (max 40 characters)").optional().nullable(),
+    order: z.number().int().min(0).default(0),
+    isActive: z.boolean().default(true),
+    startAt: z.string().optional().nullable(),
+    endAt: z.string().optional().nullable(),
+  })
+  .refine((data) => !data.startAt || !data.endAt || new Date(data.endAt) > new Date(data.startAt), {
+    message: "End date must be after the start date",
+    path: ["endAt"],
+  });
+export type BannerInput = z.infer<typeof bannerInputSchema>;

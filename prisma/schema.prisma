@@ -393,14 +393,14 @@ model ShareEvent {
 // ----------------------------------------------------------------------------
 
 model NewsletterSubscriber {
-  id                String           @id @default(cuid())
-  email             String           @unique
-  status            SubscriberStatus @default(PENDING)
-  source            String?
-  confirmedAt       DateTime?
-  unsubscribedAt    DateTime?
-  createdAt         DateTime         @default(now())
-  unsubscribeToken  String           @unique @default(cuid())
+  id               String           @id @default(cuid())
+  email            String           @unique
+  status           SubscriberStatus @default(PENDING)
+  source           String?
+  confirmedAt      DateTime?
+  unsubscribedAt   DateTime?
+  createdAt        DateTime         @default(now())
+  unsubscribeToken String           @unique @default(cuid())
 
   @@map("newsletter_subscribers")
 }
@@ -469,4 +469,33 @@ model SiteSettings {
   updatedAt DateTime @updatedAt
 
   @@map("site_settings")
+}
+
+/// Promotional/marketing banners shown in the homepage hero — product
+/// launches, offers, announcements. Falls back to the editorial hero
+/// (latest posts) whenever no banner is active.
+model Banner {
+  id       String  @id @default(cuid())
+  title    String?
+  subtitle String?
+
+  imageUrl String
+  imageAlt String?
+
+  linkUrl  String?
+  ctaLabel String?
+
+  order    Int     @default(0)
+  isActive Boolean @default(true)
+
+  // Optional scheduling window — lets an "offer" banner expire on its own
+  // without an admin having to remember to come back and deactivate it.
+  startAt DateTime?
+  endAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, order])
+  @@map("banners")
 }

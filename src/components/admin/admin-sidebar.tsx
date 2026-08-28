@@ -17,6 +17,7 @@ import {
   BarChart3Icon,
   ExternalLinkIcon,
   UserCogIcon,
+  MegaphoneIcon,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ const NAV = [
       { href: "/admin/categories", label: "Categories", icon: FolderTreeIcon, roles: EDITORIAL },
       { href: "/admin/tags", label: "Tags", icon: TagIcon, roles: EDITORIAL },
       { href: "/admin/authors", label: "Authors", icon: UsersIcon, roles: EDITORIAL },
+      { href: "/admin/banners", label: "Banners", icon: MegaphoneIcon, roles: EDITORIAL },
       { href: "/admin/media", label: "Media Library", icon: ImageIcon },
     ],
   },
