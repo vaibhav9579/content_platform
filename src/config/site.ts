@@ -1,9 +1,10 @@
 export const siteConfig = {
-  name: process.env.NEXT_PUBLIC_SITE_NAME ?? "The Publication",
-  shortName: "Publication",
+  name: process.env.NEXT_PUBLIC_SITE_NAME ?? "Instrutel",
+  shortName: "Instrutel",
   description:
     "In-depth articles, tutorials, and guides — written by experts, structured for humans and AI alike.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  logo: "/images/instrutel-logo.png",
   ogImage: "/og-default.png",
   locale: "en_US",
   links: {

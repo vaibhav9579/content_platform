@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SignInButton, UserButton } from "@clerk/nextjs";
+import Image from "next/image";
 
 import { navConfig, siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,8 @@ export async function SiteHeader() {
   return (
     <header className="border-border/60 bg-background/80 sticky top-0 z-40 border-b backdrop-blur-md">
       <div className="container-wide flex h-16 items-center justify-between gap-4">
-        <Link href="/" className="shrink-0 font-serif text-lg font-semibold tracking-tight">
-          {siteConfig.name}
+        <Link href="/" className="shrink-0 rounded-md bg-white px-2 py-1.5">
+          <Image src={siteConfig.logo} alt={siteConfig.name} width={1000} height={328} className="h-7 w-auto" priority />
         </Link>
 
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
@@ -50,13 +50,7 @@ export async function SiteHeader() {
               </Link>
             </Button>
           )}
-          {user ? (
-            <UserButton afterSwitchSessionUrl="/" />
-          ) : (
-            <SignInButton mode="modal">
-              <Button size="sm">Sign in</Button>
-            </SignInButton>
-          )}
+          {!user && <Button size="sm">Sign in</Button>}
         </div>
       </div>
     </header>

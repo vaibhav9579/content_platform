@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 import { siteConfig } from "@/config/site";
 import { NewsletterForm } from "@/components/shared/newsletter-form";
@@ -9,8 +10,8 @@ export function SiteFooter() {
     <footer className="border-border/60 bg-muted/20 mt-24 border-t">
       <div className="container-wide grid gap-10 py-14 md:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
         <div>
-          <Link href="/" className="font-serif text-lg font-semibold tracking-tight">
-            {siteConfig.name}
+          <Link href="/" className="inline-block rounded-md bg-white px-2 py-1.5">
+            <Image src={siteConfig.logo} alt={siteConfig.name} width={1000} height={328} className="h-8 w-auto" />
           </Link>
           <p className="text-muted-foreground mt-3 max-w-sm text-sm leading-relaxed">
             {siteConfig.description}

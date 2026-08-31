@@ -1,3 +1,6 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+
 import { ImageResponse } from "next/og";
 
 import { prisma } from "@/lib/prisma";
@@ -13,6 +16,8 @@ export default async function OpengraphImage({ params }: { params: Promise<{ slu
     where: { slug, deletedAt: null },
     select: { title: true, category: { select: { name: true } }, author: { select: { name: true } } },
   });
+  const logoData = await fs.readFile(path.join(process.cwd(), "public", siteConfig.logo));
+  const logoSrc = `data:image/png;base64,${logoData.toString("base64")}`;
 
   return new ImageResponse(
     (
@@ -29,8 +34,16 @@ export default async function OpengraphImage({ params }: { params: Promise<{ slu
           fontFamily: "sans-serif",
         }}
       >
-        <div style={{ display: "flex", fontSize: 28, opacity: 0.7, letterSpacing: 2 }}>
-          {siteConfig.name.toUpperCase()}
+        <div
+          style={{
+            display: "flex",
+            background: "white",
+            borderRadius: 12,
+            padding: "10px 18px",
+            alignSelf: "flex-start",
+          }}
+        >
+          <img src={logoSrc} width={180} height={59} alt={siteConfig.name} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {post?.category && (

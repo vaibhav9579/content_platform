@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Role } from "@prisma/client";
 import {
@@ -77,13 +78,11 @@ export function AdminSidebar({ role, collapsed = false }: { role: Role; collapse
       )}
     >
       <div className="flex h-16 w-64 shrink-0 items-center gap-2.5 border-b px-5">
-        <Link href="/admin/dashboard" className="flex items-center gap-2.5">
-          <span className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
-            {siteConfig.shortName.charAt(0).toUpperCase()}
+        <Link href="/admin/dashboard" className="flex items-center gap-2">
+          <span className="rounded-md bg-white px-1.5 py-1">
+            <Image src={siteConfig.logo} alt={siteConfig.shortName} width={1000} height={328} className="h-6 w-auto" />
           </span>
-          <span className="font-serif text-base font-semibold tracking-tight">
-            {siteConfig.shortName} CMS
-          </span>
+          <span className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">CMS</span>
         </Link>
       </div>
 

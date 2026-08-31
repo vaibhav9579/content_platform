@@ -22,8 +22,13 @@ export function teamInviteEmailHtml(opts: { role: string; invitedByName: string 
         <td align="center">
           <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;padding:32px;">
             <tr>
+              <td style="padding-bottom:12px;">
+                <img src="${absoluteUrl(siteConfig.logo)}" alt="${siteConfig.name}" height="28" style="height:28px;width:auto;display:block;" />
+              </td>
+            </tr>
+            <tr>
               <td style="font-size:13px;color:#78716c;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:16px;">
-                ${siteConfig.name} &middot; Team invite
+                Team invite
               </td>
             </tr>
             <tr>
