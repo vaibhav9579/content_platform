@@ -11,7 +11,7 @@ export function SiteFooter() {
       <div className="container-wide grid gap-10 py-14 md:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
         <div>
           <Link href="/" className="inline-block rounded-md bg-white px-2 py-1.5">
-            <Image src={siteConfig.logo} alt={siteConfig.name} width={1000} height={328} className="h-8 w-auto" />
+            <Image src={siteConfig.logo} alt={siteConfig.name} width={98} height={32} className="block" />
           </Link>
           <p className="text-muted-foreground mt-3 max-w-sm text-sm leading-relaxed">
             {siteConfig.description}
