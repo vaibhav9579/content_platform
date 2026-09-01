@@ -15,12 +15,14 @@ export function ImageUploadField({
   onChange,
   folder = "content-platform/uploads",
   aspect = "aspect-video",
+  fit = "cover",
   label,
 }: {
   value: string;
   onChange: (url: string) => void;
   folder?: string;
   aspect?: string;
+  fit?: "cover" | "contain";
   label?: string;
 }) {
   const [status, setStatus] = React.useState<"idle" | "compressing" | "uploading">("idle");
@@ -76,7 +78,13 @@ export function ImageUploadField({
       >
         {value ? (
           <>
-            <Image src={value} alt="" fill className="object-cover" unoptimized />
+            <Image
+              src={value}
+              alt=""
+              fill
+              className={fit === "contain" ? "object-contain" : "object-cover"}
+              unoptimized
+            />
             <Button
               type="button"
               size="icon"

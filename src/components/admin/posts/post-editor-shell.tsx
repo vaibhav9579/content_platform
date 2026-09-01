@@ -644,6 +644,7 @@ export function PostEditorShell({
               value={coverImageUrl}
               onChange={setCoverImageUrl}
               folder="content-platform/covers"
+              fit="contain"
             />
             <Input
               placeholder="Alt text for accessibility & SEO"
