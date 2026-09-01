@@ -13,7 +13,7 @@ export function HeroSection({ posts }: { posts: PublicPostListItem[] }) {
   return (
     <section className="container-wide grid gap-8 py-10 lg:grid-cols-[1.4fr_1fr] lg:py-16">
       <Link href={`/blog/${lead.slug}`} className="group block animate-fade-up">
-        <div className="bg-muted relative aspect-[16/10] overflow-hidden rounded-2xl">
+        <div className="relative aspect-[16/10] overflow-hidden rounded-2xl">
           {lead.coverImageUrl && (
             <Image
               src={lead.coverImageUrl}

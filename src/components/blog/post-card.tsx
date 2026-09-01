@@ -13,7 +13,7 @@ export function PostCard({ post, size = "default" }: { post: PublicPostListItem;
       <Link
         href={`/blog/${post.slug}`}
         className={cn(
-          "bg-muted relative block overflow-hidden rounded-xl",
+          "relative block overflow-hidden rounded-xl",
           size === "large" ? "aspect-[16/10]" : "aspect-video",
         )}
       >
