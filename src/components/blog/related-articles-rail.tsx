@@ -25,7 +25,7 @@ export function RelatedArticlesRail({ posts }: { posts: PublicPostListItem[] }) 
                     alt={post.coverImageAlt ?? post.title}
                     fill
                     sizes="56px"
-                    className="object-cover transition-transform group-hover:scale-105"
+                    className="object-contain transition-transform group-hover:scale-105"
                   />
                 )}
               </div>

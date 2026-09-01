@@ -23,7 +23,7 @@ export function PostCard({ post, size = "default" }: { post: PublicPostListItem;
             alt={post.coverImageAlt ?? post.title}
             fill
             sizes={size === "large" ? "(min-width: 1024px) 60vw, 100vw" : "(min-width: 1024px) 33vw, 100vw"}
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            className="object-contain transition-transform duration-500 group-hover:scale-[1.03]"
           />
         ) : (
           <div className="from-muted to-muted/50 flex size-full items-center justify-center bg-gradient-to-br">
@@ -76,7 +76,7 @@ export function PostCardCompact({ post }: { post: PublicPostListItem }) {
     <Link href={`/blog/${post.slug}`} className="group flex items-center gap-3">
       <div className="bg-muted relative size-16 shrink-0 overflow-hidden rounded-lg">
         {post.coverImageUrl && (
-          <Image src={post.coverImageUrl} alt={post.title} fill sizes="64px" className="object-cover" />
+          <Image src={post.coverImageUrl} alt={post.title} fill sizes="64px" className="object-contain" />
         )}
       </div>
       <div className="min-w-0">
