@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { SignInButton, UserButton } from "@clerk/nextjs";
 
 import { navConfig, siteConfig } from "@/config/site";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,13 @@ export async function SiteHeader() {
               </Link>
             </Button>
           )}
-          {!user && <Button size="sm">Sign in</Button>}
+          {user ? (
+            <UserButton afterSwitchSessionUrl="/" />
+          ) : (
+            <SignInButton mode="modal">
+              <Button size="sm">Sign in</Button>
+            </SignInButton>
+          )}
         </div>
       </div>
     </header>
