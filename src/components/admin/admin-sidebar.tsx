@@ -82,7 +82,6 @@ export function AdminSidebar({ role, collapsed = false }: { role: Role; collapse
           <span className="rounded-md bg-white px-1.5 py-1">
             <Image src={siteConfig.logo} alt={siteConfig.shortName} width={73} height={24} className="block" />
           </span>
-          <span className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">CMS</span>
         </Link>
       </div>
 
