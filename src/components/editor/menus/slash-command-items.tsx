@@ -12,6 +12,7 @@ import {
   MinusIcon,
   TableIcon,
   ImageIcon,
+  ImagesIcon,
   ClapperboardIcon,
   AtSignIcon,
   VideoIcon,
@@ -121,6 +122,14 @@ const ALL_ITEMS: SlashCommandItem[] = [
     description: "Upload or choose an image",
     icon: ImageIcon,
     command: ({ editor, range }) => requestMediaPicker(editor, range),
+  },
+  {
+    title: "Image Row",
+    description: "Multiple images side by side, with captions",
+    icon: ImagesIcon,
+    keywords: ["gallery", "images", "row", "grid"],
+    command: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).insertContent({ type: "imageGallery" }).run(),
   },
   {
     title: "YouTube",

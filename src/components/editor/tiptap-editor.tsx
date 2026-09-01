@@ -32,6 +32,7 @@ import { MermaidBlock } from "@/components/editor/extensions/mermaid-block";
 import { MathBlock } from "@/components/editor/extensions/math-block";
 import { TocBlock } from "@/components/editor/extensions/toc-block";
 import { ProsConsBlock } from "@/components/editor/extensions/pros-cons-block";
+import { ImageGallery } from "@/components/editor/extensions/image-gallery";
 import { uploadImage } from "@/lib/image/upload-image";
 import { registerMediaPickerHandler } from "@/lib/editor/media-picker-bridge";
 import { MediaPickerDialog, type PickedMedia } from "@/components/admin/media-picker-dialog";
@@ -109,6 +110,7 @@ export const TiptapEditor = React.forwardRef<
       MathBlock,
       TocBlock,
       ProsConsBlock,
+      ImageGallery,
       SlashCommand,
     ],
     editorProps: {
