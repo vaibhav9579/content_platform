@@ -77,15 +77,15 @@ export function AdminSidebar({ role, collapsed = false }: { role: Role; collapse
         collapsed ? "w-0 border-r-0" : "w-64",
       )}
     >
-      <div className="flex h-16 w-64 shrink-0 items-center gap-2.5 border-b px-5">
-        <Link href="/admin/dashboard" className="flex items-center gap-2">
-          <span className="rounded-md bg-white px-1.5 py-1">
-            <Image src={siteConfig.logo} alt={siteConfig.shortName} width={73} height={24} className="block" />
+      <div className="flex w-64 shrink-0 items-center border-b px-5 py-4">
+        <Link href="/admin/dashboard" className="block">
+          <span className="block rounded-md bg-white p-2">
+            <Image src={siteConfig.logo} alt={siteConfig.shortName} width={200} height={66} className="block" />
           </span>
         </Link>
       </div>
 
-      <nav className="w-64 flex-1 space-y-6 overflow-y-auto px-3 py-5">
+      <nav className="admin-scrollbar w-64 flex-1 space-y-6 overflow-y-auto px-3 py-5">
         {nav.map((group) => (
           <div key={group.section}>
             <p className="text-muted-foreground px-3 pb-1.5 text-[11px] font-semibold tracking-wide uppercase">
