@@ -168,7 +168,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
             </header>
 
             {post.coverImageUrl && (
-              <div className="bg-muted relative mx-auto mt-8 aspect-video w-full max-w-4xl overflow-hidden rounded-2xl">
+              <div className="relative mx-auto mt-8 aspect-video w-full max-w-4xl overflow-hidden rounded-2xl">
                 <Image
                   src={post.coverImageUrl}
                   alt={post.coverImageAlt ?? post.title}
