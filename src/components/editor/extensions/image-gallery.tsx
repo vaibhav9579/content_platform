@@ -132,7 +132,18 @@ export const ImageGallery = Node.create({
           "figure",
           { style: "margin:0;" },
           ...(img.link
-            ? [["a", { href: img.link, style: "display:block;text-decoration:none;color:inherit;" }, ...figureChildren]]
+            ? [
+                [
+                  "a",
+                  {
+                    href: img.link,
+                    target: "_blank",
+                    rel: "noopener",
+                    style: "display:block;text-decoration:none;color:inherit;",
+                  },
+                  ...figureChildren,
+                ],
+              ]
             : figureChildren),
         ];
       }),

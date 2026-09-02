@@ -38,7 +38,7 @@ export const LinkableImage = TiptapImage.extend({
     const { href, ...rest } = HTMLAttributes;
     const img: DOMOutputSpec = ["img", mergeAttributes(rest)];
     if (!href) return img;
-    return ["a", { href, "data-node": "linked-image" }, img];
+    return ["a", { href, target: "_blank", rel: "noopener", "data-node": "linked-image" }, img];
   },
 });
 
