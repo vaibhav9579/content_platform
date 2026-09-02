@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MediaPickerDialog, type PickedMedia } from "@/components/admin/media-picker-dialog";
 
-type GalleryImage = { url: string; alt: string; caption: string };
+type GalleryImage = { url: string; alt: string; caption: string; link: string };
 
 function ImageGalleryView({ node, updateAttributes }: NodeViewProps) {
   const images: GalleryImage[] = node.attrs.images ?? [];
@@ -17,7 +17,7 @@ function ImageGalleryView({ node, updateAttributes }: NodeViewProps) {
 
   function addImage(media: PickedMedia) {
     updateAttributes({
-      images: [...images, { url: media.url, alt: media.altText ?? "", caption: media.altText ?? "" }],
+      images: [...images, { url: media.url, alt: media.altText ?? "", caption: media.altText ?? "", link: "" }],
     });
   }
 
@@ -56,6 +56,11 @@ function ImageGalleryView({ node, updateAttributes }: NodeViewProps) {
                   placeholder="Caption (optional)"
                   value={img.caption}
                   onChange={(e) => updateImage(i, { caption: e.target.value })}
+                />
+                <Input
+                  placeholder="Link URL (optional, e.g. a product page)"
+                  value={img.link ?? ""}
+                  onChange={(e) => updateImage(i, { link: e.target.value })}
                 />
               </div>
             ))}
@@ -100,30 +105,37 @@ export const ImageGallery = Node.create({
         "data-node": "image-gallery",
         style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin:1.5em 0;",
       }),
-      ...images.map((img) => [
-        "figure",
-        { style: "margin:0;" },
-        [
-          "img",
-          {
-            src: img.url,
-            alt: img.alt || img.caption || "",
-            style: "width:100%;height:auto;border-radius:12px;display:block;",
-          },
-        ],
-        ...(img.caption
-          ? [
-              [
-                "figcaption",
-                {
-                  style:
-                    "margin-top:0.5em;text-align:center;font-size:0.875rem;color:var(--muted-foreground);border:1px solid var(--border);border-radius:6px;padding:0.375em 0.5em;",
-                },
-                img.caption,
-              ],
-            ]
-          : []),
-      ]),
+      ...images.map((img) => {
+        const figureChildren = [
+          [
+            "img",
+            {
+              src: img.url,
+              alt: img.alt || img.caption || "",
+              style: "width:100%;height:auto;border-radius:12px;display:block;",
+            },
+          ],
+          ...(img.caption
+            ? [
+                [
+                  "figcaption",
+                  {
+                    style:
+                      "margin-top:0.5em;text-align:center;font-size:0.875rem;color:var(--muted-foreground);border:1px solid var(--border);border-radius:6px;padding:0.375em 0.5em;",
+                  },
+                  img.caption,
+                ],
+              ]
+            : []),
+        ];
+        return [
+          "figure",
+          { style: "margin:0;" },
+          ...(img.link
+            ? [["a", { href: img.link, style: "display:block;text-decoration:none;color:inherit;" }, ...figureChildren]]
+            : figureChildren),
+        ];
+      }),
     ];
   },
 

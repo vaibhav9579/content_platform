@@ -4,7 +4,6 @@ import * as React from "react";
 import { toast } from "sonner";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
@@ -33,6 +32,7 @@ import { MathBlock } from "@/components/editor/extensions/math-block";
 import { TocBlock } from "@/components/editor/extensions/toc-block";
 import { ProsConsBlock } from "@/components/editor/extensions/pros-cons-block";
 import { ImageGallery } from "@/components/editor/extensions/image-gallery";
+import { LinkableImage } from "@/components/editor/extensions/linkable-image";
 import { uploadImage } from "@/lib/image/upload-image";
 import { registerMediaPickerHandler } from "@/lib/editor/media-picker-bridge";
 import { MediaPickerDialog, type PickedMedia } from "@/components/admin/media-picker-dialog";
@@ -79,7 +79,7 @@ export const TiptapEditor = React.forwardRef<
         },
       }),
       CodeBlockWithCopy,
-      Image.configure({ HTMLAttributes: { class: "rounded-xl" }, allowBase64: false }),
+      LinkableImage.configure({ HTMLAttributes: { class: "rounded-xl" }, allowBase64: false }),
       Placeholder.configure({
         placeholder: ({ node }) =>
           node.type.name === "heading" ? "Heading…" : "Write something, or press '/' for commands…",
