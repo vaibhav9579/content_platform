@@ -217,10 +217,13 @@ export async function autosavePost(id: string, contentJson: unknown, contentHtml
 
   try {
     const readingStats = computeReadingStats(contentHtml);
+    const sanitizedContentJson =
+      contentJson == null ? contentJson : JSON.parse(JSON.stringify(contentJson));
+
     await prisma.post.update({
       where: { id },
       data: {
-        contentJson: contentJson as never,
+        contentJson: sanitizedContentJson as never,
         contentHtml,
         readingTimeMinutes: readingStats.minutes,
         wordCount: readingStats.words,

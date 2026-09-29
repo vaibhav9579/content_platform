@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   compress: true,
+  serverExternalPackages: ["isomorphic-dompurify", "jsdom"],
 
   images: {
     formats: ["image/avif", "image/webp"],

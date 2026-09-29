@@ -77,7 +77,7 @@ npm install
 cp .env.example .env
 # fill in DATABASE_URL, Clerk keys, Cloudinary credentials
 ```
-
+  
 ### 3. Set up the database
 
 ```bash
