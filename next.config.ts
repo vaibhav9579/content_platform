@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
   compress: true,
-  serverExternalPackages: ["isomorphic-dompurify", "jsdom"],
+  serverExternalPackages: ["isomorphic-dompurify", "jsdom", "@prisma/client"],
 
   images: {
     formats: ["image/avif", "image/webp"],
