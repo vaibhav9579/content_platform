@@ -22,9 +22,9 @@ type ActionResult<T = void> =
   | { success: false; error: string; section?: "seo" | "geo" };
 
 function revalidatePublicPost(slug: string) {
-  revalidatePath(`/blog/${slug}`);
-  revalidatePath("/");
-  revalidatePath("/blog");
+  revalidatePath(`/blog/${slug}`, "page");
+  revalidatePath("/", "page");
+  revalidatePath("/blog", "page");
 }
 
 export async function savePost(rawInput: PostInput): Promise<ActionResult<{ id: string; slug: string }>> {
@@ -208,11 +208,20 @@ export async function autosavePost(id: string, contentJson: unknown, contentHtml
   const user = await requireStaff();
   if (!user) return { success: false as const, error: "Unauthorized" };
 
-  if (!canManageAllPosts(user.role)) {
-    const existing = await prisma.post.findUnique({ where: { id }, select: { authorId: true } });
-    if (!existing || existing.authorId !== user.author?.id) {
-      return { success: false as const, error: "You can only edit your own posts." };
-    }
+  const existing = await prisma.post.findUnique({
+    where: { id },
+    select: { authorId: true, contentHtml: true, slug: true, status: true },
+  });
+  if (!existing) return { success: false as const, error: "Post not found" };
+
+  if (!canManageAllPosts(user.role) && existing.authorId !== user.author?.id) {
+    return { success: false as const, error: "You can only edit your own posts." };
+  }
+
+  // Guard: Never overwrite existing contentHtml with empty/blank payload during autosave
+  const isIncomingEmpty = !contentHtml || contentHtml.trim() === "" || contentHtml.trim() === "<p></p>";
+  if (isIncomingEmpty && existing.contentHtml && existing.contentHtml.trim().length > 0) {
+    return { success: true as const, savedAt: new Date().toISOString() };
   }
 
   try {

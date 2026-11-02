@@ -11,12 +11,12 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     qualities: [60, 75, 90],
     remotePatterns: [
+      // Legacy Cloudinary images still referenced in existing posts / database
       { protocol: "https", hostname: "res.cloudinary.com" },
       { protocol: "https", hostname: "img.clerk.com" },
       { protocol: "https", hostname: "images.clerk.dev" },
       { protocol: "https", hostname: "i.ytimg.com" },
-      // Demo/seed content only — real deployments serve all imagery through
-      // Cloudinary; remove these once seed data is replaced with real uploads.
+      // Demo/seed content only — remove these once seed data is replaced with real uploads.
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "i.pravatar.cc" },
     ],

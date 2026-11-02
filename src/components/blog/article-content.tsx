@@ -16,16 +16,23 @@ const ALLOWED_ATTR = [
 ];
 
 export function sanitizeArticleHtml(html: string) {
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ADD_TAGS: ["iframe"],
-  });
+  if (!html) return "";
+  try {
+    const clean = DOMPurify.sanitize(html, {
+      ALLOWED_TAGS,
+      ALLOWED_ATTR,
+      ADD_TAGS: ["iframe"],
+    });
+    return clean || html;
+  } catch (err) {
+    console.error("DOMPurify sanitize error:", err);
+    return html;
+  }
 }
 
 export function ArticleContent({ html, id }: { html: string; id: string }) {
   const clean = sanitizeArticleHtml(html);
   return (
-    <div id={id} className="prose-article" dangerouslySetInnerHTML={{ __html: clean }} />
+    <div id={id} className="prose-article max-w-full min-w-0 break-words" dangerouslySetInnerHTML={{ __html: clean }} />
   );
 }

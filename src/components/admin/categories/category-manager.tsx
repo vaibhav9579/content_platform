@@ -23,6 +23,7 @@ import { PaginationBar } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 import { saveCategory, deleteCategory } from "@/features/categories/actions";
 import { slugifyTitle } from "@/lib/content/slug";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 type Category = {
   id: string;
@@ -51,6 +52,7 @@ export function CategoryManager({
   pageSize: number;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [form, setForm] = React.useState(emptyForm);
   const [pending, startTransition] = useTransition();
   const [slugTouched, setSlugTouched] = React.useState(false);
@@ -92,11 +94,21 @@ export function CategoryManager({
     });
   }
 
-  function handleDelete(id: string) {
+  function handleDelete(id: string, name: string) {
+    setDeleteTarget({ id, name });
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
     startTransition(async () => {
       const result = await deleteCategory(id);
-      if (result.success) toast.success("Category deleted");
-      else toast.error(result.error);
+      if (result.success) {
+        toast.success("Category deleted");
+        setDeleteTarget(null);
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 
@@ -214,7 +226,7 @@ export function CategoryManager({
                   <Button variant="ghost" size="icon" onClick={() => openEdit(category)}>
                     <PencilIcon className="size-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(category.id)}>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(category.id, category.name)} aria-label="Delete category">
                     <Trash2Icon className="size-4" />
                   </Button>
                 </TableCell>
@@ -236,6 +248,24 @@ export function CategoryManager({
         totalCount={totalCount}
         pageSize={pageSize}
         hrefForPage={(p) => `/admin/categories?page=${p}`}
+      />
+
+      <ConfirmActionDialog
+        open={!!deleteTarget}
+        onOpenChange={(next) => !next && !pending && setDeleteTarget(null)}
+        title="Delete Category?"
+        description={
+          <>
+            Are you sure you want to delete category &quot;
+            <span className="font-medium text-foreground">{deleteTarget?.name}</span>
+            &quot;? Any subcategories will be detached and posts will lose this category.
+          </>
+        }
+        confirmLabel="Delete Category"
+        variant="destructive"
+        icon={Trash2Icon}
+        onConfirm={confirmDelete}
+        isPending={pending}
       />
     </div>
   );

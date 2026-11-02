@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { requireStaff } from "@/lib/auth";
-import { cloudinary } from "@/lib/cloudinary";
+import { deleteUploadedFile } from "@/lib/storage";
 
 type ActionResult<T = void> = { success: true; data: T } | { success: false; error: string };
 
@@ -37,7 +37,7 @@ export async function updateMediaAltText(id: string, altText: string): Promise<A
   return { success: true, data: undefined };
 }
 
-/** Moves a media asset to trash. The Cloudinary asset is left untouched until permanent delete. */
+/** Moves a media asset to trash. The local file is left untouched until permanent delete. */
 export async function deleteMedia(id: string): Promise<ActionResult> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
@@ -59,7 +59,7 @@ export async function restoreMedia(id: string): Promise<ActionResult> {
   return { success: true, data: undefined };
 }
 
-/** Irreversibly deletes a trashed media asset from Cloudinary and the database. */
+/** Irreversibly deletes a trashed media asset from local storage and the database. */
 export async function permanentlyDeleteMedia(id: string): Promise<ActionResult> {
   const user = await requireStaff();
   if (!user) return { success: false, error: "Unauthorized" };
@@ -70,9 +70,7 @@ export async function permanentlyDeleteMedia(id: string): Promise<ActionResult> 
     return { success: false, error: "Move the asset to trash before deleting it permanently." };
   }
 
-  await cloudinary.uploader.destroy(media.publicId).catch((err) => {
-    console.error("Cloudinary destroy failed", err);
-  });
+  await deleteUploadedFile(media.publicId);
   await prisma.media.delete({ where: { id } });
 
   revalidatePath("/admin/media");

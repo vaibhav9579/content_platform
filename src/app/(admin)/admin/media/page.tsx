@@ -13,7 +13,7 @@ export default async function AdminMediaPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Media Library</h1>
         <p className="text-muted-foreground text-sm">
-          Every image uploaded through the editor, optimized and served via Cloudinary.
+          Every image uploaded through the editor, stored and served locally.
         </p>
       </div>
       <MediaLibrary

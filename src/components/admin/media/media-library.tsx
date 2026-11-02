@@ -19,6 +19,7 @@ import {
 } from "@/features/media/actions";
 import { compressImageIfNeeded } from "@/lib/image/compress-image";
 import { PaginationBar } from "@/components/ui/pagination";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 type Media = {
   id: string;
@@ -51,6 +52,7 @@ export function MediaLibrary({
   const [uploading, setUploading] = React.useState(false);
   const [selected, setSelected] = React.useState<Media | null>(null);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -123,11 +125,18 @@ export function MediaLibrary({
   }
 
   function handlePermanentDelete(id: string) {
-    if (!confirm("Permanently delete this asset from Cloudinary? This cannot be undone.")) return;
+    setDeleteTargetId(id);
+  }
+
+  function confirmPermanentDelete() {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
     startTransition(async () => {
       const result = await permanentlyDeleteMedia(id);
       if (result.success) {
         toast.success("Deleted permanently");
+        setDeleteTargetId(null);
+        setSelected(null);
         loadPage(tab, page);
       } else toast.error(result.error);
     });
@@ -268,6 +277,18 @@ export function MediaLibrary({
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={!!deleteTargetId}
+        onOpenChange={(open) => !open && !pending && setDeleteTargetId(null)}
+        title="Permanently Delete Asset?"
+        description="Are you sure you want to permanently delete this asset from storage? This action cannot be undone."
+        confirmLabel="Delete Permanently"
+        variant="destructive"
+        icon={Trash2Icon}
+        onConfirm={confirmPermanentDelete}
+        isPending={pending}
+      />
     </div>
   );
 }

@@ -24,6 +24,7 @@ import {
   updatePostStatus,
 } from "@/features/posts/actions/post-actions";
 import { formatDate, formatCompactNumber } from "@/lib/utils";
+import { DeletePostDialog } from "@/components/admin/posts/delete-post-dialog";
 
 type Post = Awaited<ReturnType<typeof listPostsForAdmin>>["posts"][number];
 type TabValue = PostStatus | "ALL" | "TRASH";
@@ -69,6 +70,11 @@ export function PostTable({
   const [totalCount, setTotalCount] = React.useState(initialTotalCount);
   const [totalPages, setTotalPages] = React.useState(initialTotalPages);
   const [pending, startTransition] = useTransition();
+  const [deleteTarget, setDeleteTarget] = React.useState<{
+    id: string;
+    title: string;
+    isPermanent: boolean;
+  } | null>(null);
 
   function refetch(nextTab: TabValue, nextSearch: string, nextPage: number) {
     startTransition(async () => {
@@ -108,15 +114,8 @@ export function PostTable({
   // Removing/adding a row can leave the current page short (or overfull by
   // one), so reload the page from the server rather than patching the local
   // array — keeps counts/pages accurate.
-  function handleDelete(id: string) {
-    if (!confirm("Move this post to trash? You can restore it later from the Trash tab.")) return;
-    startTransition(async () => {
-      const result = await deletePost(id);
-      if (result.success) {
-        toast.success("Moved to trash");
-        refetch(tab, search, page);
-      } else toast.error(result.error);
-    });
+  function handleDelete(id: string, title: string) {
+    setDeleteTarget({ id, title, isPermanent: false });
   }
 
   function handleRestore(id: string) {
@@ -129,14 +128,22 @@ export function PostTable({
     });
   }
 
-  function handlePermanentDelete(id: string) {
-    if (!confirm("Permanently delete this post? This cannot be undone.")) return;
+  function handlePermanentDelete(id: string, title: string) {
+    setDeleteTarget({ id, title, isPermanent: true });
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    const { id, isPermanent } = deleteTarget;
     startTransition(async () => {
-      const result = await permanentlyDeletePost(id);
+      const result = isPermanent ? await permanentlyDeletePost(id) : await deletePost(id);
       if (result.success) {
-        toast.success("Deleted permanently");
+        toast.success(isPermanent ? "Deleted permanently" : "Moved to trash");
+        setDeleteTarget(null);
         refetch(tab, search, page);
-      } else toast.error(result.error);
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 
@@ -243,7 +250,7 @@ export function PostTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handlePermanentDelete(post.id)}
+                          onClick={() => handlePermanentDelete(post.id, post.title)}
                           aria-label="Delete permanently"
                         >
                           <Trash2Icon className="text-destructive size-4" />
@@ -276,7 +283,7 @@ export function PostTable({
                         <Button variant="ghost" size="icon" onClick={() => handleDuplicate(post.id)} aria-label="Duplicate">
                           <CopyIcon className="size-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(post.id)} aria-label="Move to trash">
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(post.id, post.title)} aria-label="Move to trash">
                           <Trash2Icon className="size-4" />
                         </Button>
                       </>
@@ -301,6 +308,15 @@ export function PostTable({
         totalCount={totalCount}
         pageSize={pageSize}
         onPageChange={(p) => refetch(tab, search, p)}
+      />
+
+      <DeletePostDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && !pending && setDeleteTarget(null)}
+        postTitle={deleteTarget?.title}
+        isPermanent={deleteTarget?.isPermanent}
+        onConfirm={confirmDelete}
+        isPending={pending}
       />
     </div>
   );

@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PaginationBar } from "@/components/ui/pagination";
 import { saveTag, deleteTag } from "@/features/tags/actions";
 import { slugifyTitle } from "@/lib/content/slug";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 type Tag = { id: string; name: string; slug: string; description: string | null; _count: { posts: number } };
 
@@ -39,6 +40,7 @@ export function TagManager({
   pageSize: number;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [form, setForm] = React.useState(emptyForm);
   const [pending, startTransition] = useTransition();
   const [slugTouched, setSlugTouched] = React.useState(false);
@@ -71,11 +73,21 @@ export function TagManager({
     });
   }
 
-  function handleDelete(id: string) {
+  function handleDelete(id: string, name: string) {
+    setDeleteTarget({ id, name });
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
     startTransition(async () => {
       const result = await deleteTag(id);
-      if (result.success) toast.success("Tag deleted");
-      else toast.error(result.error);
+      if (result.success) {
+        toast.success("Tag deleted");
+        setDeleteTarget(null);
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 
@@ -149,7 +161,7 @@ export function TagManager({
                   <Button variant="ghost" size="icon" onClick={() => openEdit(tag)}>
                     <PencilIcon className="size-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(tag.id)}>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(tag.id, tag.name)} aria-label="Delete tag">
                     <Trash2Icon className="size-4" />
                   </Button>
                 </TableCell>
@@ -171,6 +183,24 @@ export function TagManager({
         totalCount={totalCount}
         pageSize={pageSize}
         hrefForPage={(p) => `/admin/tags?page=${p}`}
+      />
+
+      <ConfirmActionDialog
+        open={!!deleteTarget}
+        onOpenChange={(next) => !next && !pending && setDeleteTarget(null)}
+        title="Delete Tag?"
+        description={
+          <>
+            Are you sure you want to delete tag &quot;
+            <span className="font-medium text-foreground">{deleteTarget?.name}</span>
+            &quot;? Posts associated with this tag will remain, but the tag will be removed.
+          </>
+        }
+        confirmLabel="Delete Tag"
+        variant="destructive"
+        icon={Trash2Icon}
+        onConfirm={confirmDelete}
+        isPending={pending}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import type { Editor, Range } from "@tiptap/core";
 import { requestMediaPicker } from "@/lib/editor/media-picker-bridge";
+import { requestYoutubeDialog } from "@/lib/editor/youtube-dialog-bridge";
 import {
   Heading1Icon,
   Heading2Icon,
@@ -135,11 +136,7 @@ const ALL_ITEMS: SlashCommandItem[] = [
     title: "YouTube",
     description: "Embed a YouTube video",
     icon: ClapperboardIcon,
-    command: ({ editor, range }) => {
-      const url = window.prompt("YouTube video URL");
-      if (!url) return;
-      editor.chain().focus().deleteRange(range).setYoutubeVideo({ src: url }).run();
-    },
+    command: ({ editor, range }) => requestYoutubeDialog(editor, range),
   },
   {
     title: "Tweet",

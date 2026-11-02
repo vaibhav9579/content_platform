@@ -21,6 +21,7 @@ import {
   cancelInvite,
   getTeamMembers,
 } from "@/features/team/actions";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 type TeamData = Awaited<ReturnType<typeof getTeamMembers>>;
 type Member = TeamData["members"][number];
@@ -58,6 +59,7 @@ export function TeamManagement({
   const [invites, setInvites] = React.useState(initialInvites);
   const [pending, startTransition] = useTransition();
   const [inviteOpen, setInviteOpen] = React.useState(false);
+  const [removeTarget, setRemoveTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [email, setEmail] = React.useState("");
   const [role, setRole] = React.useState<InvitableRole>(Role.AUTHOR);
 
@@ -98,11 +100,17 @@ export function TeamManagement({
   }
 
   function handleRemove(userId: string, name: string) {
-    if (!confirm(`Remove ${name}'s CMS access? Their posts stay published and attributed to them.`)) return;
+    setRemoveTarget({ id: userId, name });
+  }
+
+  function confirmRemove() {
+    if (!removeTarget) return;
+    const { id } = removeTarget;
     startTransition(async () => {
-      const result = await removeTeamMember(userId);
+      const result = await removeTeamMember(id);
       if (result.success) {
         toast.success("Access revoked");
+        setRemoveTarget(null);
         refresh();
       } else {
         toast.error(result.error);
@@ -297,6 +305,24 @@ export function TeamManagement({
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={!!removeTarget}
+        onOpenChange={(open) => !open && !pending && setRemoveTarget(null)}
+        title="Remove CMS Access?"
+        description={
+          <>
+            Are you sure you want to remove &quot;
+            <span className="font-medium text-foreground">{removeTarget?.name}</span>
+            &quot;&apos;s CMS access? Their posts will stay published and attributed to them.
+          </>
+        }
+        confirmLabel="Remove Access"
+        variant="destructive"
+        icon={XIcon}
+        onConfirm={confirmRemove}
+        isPending={pending}
+      />
     </div>
   );
 }

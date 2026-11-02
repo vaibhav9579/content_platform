@@ -24,6 +24,7 @@ import { PaginationBar } from "@/components/ui/pagination";
 import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { saveAuthor, deleteAuthor } from "@/features/authors/actions";
 import { slugifyTitle } from "@/lib/content/slug";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 type Author = {
   id: string;
@@ -70,6 +71,7 @@ export function AuthorManager({
   pageSize: number;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [form, setForm] = React.useState(emptyForm);
   const [pending, startTransition] = useTransition();
   const [slugTouched, setSlugTouched] = React.useState(false);
@@ -113,11 +115,21 @@ export function AuthorManager({
     });
   }
 
-  function handleDelete(id: string) {
+  function handleDelete(id: string, name: string) {
+    setDeleteTarget({ id, name });
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
     startTransition(async () => {
       const result = await deleteAuthor(id);
-      if (result.success) toast.success("Author deleted");
-      else toast.error(result.error);
+      if (result.success) {
+        toast.success("Author deleted");
+        setDeleteTarget(null);
+      } else {
+        toast.error(result.error);
+      }
     });
   }
 
@@ -269,7 +281,7 @@ export function AuthorManager({
                   <Button variant="ghost" size="icon" onClick={() => openEdit(author)}>
                     <PencilIcon className="size-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(author.id)}>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(author.id, author.name)} aria-label="Delete author">
                     <Trash2Icon className="size-4" />
                   </Button>
                 </TableCell>
@@ -291,6 +303,24 @@ export function AuthorManager({
         totalCount={totalCount}
         pageSize={pageSize}
         hrefForPage={(p) => `/admin/authors?page=${p}`}
+      />
+
+      <ConfirmActionDialog
+        open={!!deleteTarget}
+        onOpenChange={(next) => !next && !pending && setDeleteTarget(null)}
+        title="Delete Author Profile?"
+        description={
+          <>
+            Are you sure you want to delete author profile &quot;
+            <span className="font-medium text-foreground">{deleteTarget?.name}</span>
+            &quot;? Articles assigned to this author will remain in the database.
+          </>
+        }
+        confirmLabel="Delete Author"
+        variant="destructive"
+        icon={Trash2Icon}
+        onConfirm={confirmDelete}
+        isPending={pending}
       />
     </div>
   );

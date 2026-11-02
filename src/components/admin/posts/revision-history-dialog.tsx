@@ -16,6 +16,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { restoreRevision } from "@/features/posts/actions/post-actions";
 import { formatDate } from "@/lib/utils";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 type Revision = {
   id: string;
@@ -27,16 +28,25 @@ type Revision = {
 
 export function RevisionHistoryDialog({ revisions }: { revisions: Revision[] }) {
   const [open, setOpen] = React.useState(false);
+  const [restoreTargetId, setRestoreTargetId] = React.useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function handleRestore(id: string) {
-    if (!confirm("Restore this revision? Your current unsaved changes will be replaced.")) return;
+    setRestoreTargetId(id);
+  }
+
+  function confirmRestore() {
+    if (!restoreTargetId) return;
+    const id = restoreTargetId;
     startTransition(async () => {
       const result = await restoreRevision(id);
       if (result.success) {
         toast.success("Revision restored — reloading…");
         window.location.reload();
-      } else toast.error(result.error);
+      } else {
+        toast.error(result.error);
+        setRestoreTargetId(null);
+      }
     });
   }
 
@@ -74,6 +84,18 @@ export function RevisionHistoryDialog({ revisions }: { revisions: Revision[] }) 
           </div>
         </ScrollArea>
       </DialogContent>
+
+      <ConfirmActionDialog
+        open={!!restoreTargetId}
+        onOpenChange={(next) => !next && !pending && setRestoreTargetId(null)}
+        title="Restore this Revision?"
+        description="Your current unsaved changes will be replaced with the content from this snapshot."
+        confirmLabel="Restore Revision"
+        variant="warning"
+        icon={HistoryIcon}
+        onConfirm={confirmRestore}
+        isPending={pending}
+      />
     </Dialog>
   );
 }

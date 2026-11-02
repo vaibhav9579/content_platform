@@ -97,9 +97,9 @@ export function articleJsonLd(post: SchemaPost) {
     "@id": `${url}#article`,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
     headline: post.title,
-    description: post.metaDescription ?? post.excerpt ?? undefined,
-    image: post.coverImageUrl ? [post.coverImageUrl] : undefined,
-    datePublished: post.publishedAt ? new Date(post.publishedAt).toISOString() : undefined,
+    image: post.coverImageUrl
+      ? [post.coverImageUrl.startsWith("http") ? post.coverImageUrl : absoluteUrl(post.coverImageUrl)]
+      : undefined,
     dateModified: post.updatedAtCms ? new Date(post.updatedAtCms).toISOString() : undefined,
     author: {
       "@type": "Person",

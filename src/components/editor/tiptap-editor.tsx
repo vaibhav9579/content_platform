@@ -35,7 +35,9 @@ import { ImageGallery } from "@/components/editor/extensions/image-gallery";
 import { LinkableImage } from "@/components/editor/extensions/linkable-image";
 import { uploadImage } from "@/lib/image/upload-image";
 import { registerMediaPickerHandler } from "@/lib/editor/media-picker-bridge";
+import { registerYoutubeDialogHandler } from "@/lib/editor/youtube-dialog-bridge";
 import { MediaPickerDialog, type PickedMedia } from "@/components/admin/media-picker-dialog";
+import { YoutubeEmbedDialog } from "@/components/editor/dialogs/youtube-embed-dialog";
 import type { Range } from "@tiptap/core";
 
 export type TiptapEditorHandle = {
@@ -59,7 +61,7 @@ async function uploadFile(file: File) {
 export const TiptapEditor = React.forwardRef<
   TiptapEditorHandle,
   {
-    initialContent?: JSONContent | null;
+    initialContent?: JSONContent | string | null;
     editable?: boolean;
     onUpdate?: (payload: { json: JSONContent; html: string; text: string; words: number }) => void;
   }
@@ -115,7 +117,7 @@ export const TiptapEditor = React.forwardRef<
     ],
     editorProps: {
       attributes: {
-        class: "prose-article focus:outline-none min-h-[60vh]",
+        class: "prose-article focus:outline-none min-h-[60vh] max-w-full min-w-0 break-words",
       },
       handleDrop: (view, event) => {
         const file = event.dataTransfer?.files?.[0];
@@ -166,14 +168,33 @@ export const TiptapEditor = React.forwardRef<
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const pickerRangeRef = React.useRef<Range | null>(null);
 
+  const [youtubeOpen, setYoutubeOpen] = React.useState(false);
+  const youtubeRangeRef = React.useRef<Range | null>(null);
+
   React.useEffect(() => {
     if (!editor) return;
     registerMediaPickerHandler((_editor, range) => {
       pickerRangeRef.current = range;
       setPickerOpen(true);
     });
-    return () => registerMediaPickerHandler(null);
+    registerYoutubeDialogHandler((_editor, range) => {
+      youtubeRangeRef.current = range ?? null;
+      setYoutubeOpen(true);
+    });
+    return () => {
+      registerMediaPickerHandler(null);
+      registerYoutubeDialogHandler(null);
+    };
   }, [editor]);
+
+  function handleEmbedYoutube(url: string) {
+    if (!editor) return;
+    const range = youtubeRangeRef.current;
+    youtubeRangeRef.current = null;
+    const chain = editor.chain().focus();
+    if (range) chain.deleteRange(range);
+    chain.setYoutubeVideo({ src: url }).run();
+  }
 
   function handlePickedImage(media: PickedMedia) {
     if (!editor) return;
@@ -187,10 +208,11 @@ export const TiptapEditor = React.forwardRef<
   if (!editor) return null;
 
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0 max-w-full overflow-hidden">
       <BubbleToolbar editor={editor} />
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className="min-w-0 max-w-full" />
       <MediaPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onSelect={handlePickedImage} />
+      <YoutubeEmbedDialog open={youtubeOpen} onOpenChange={setYoutubeOpen} onEmbed={handleEmbedYoutube} />
     </div>
   );
 });

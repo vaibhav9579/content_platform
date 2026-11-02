@@ -34,7 +34,7 @@ export function AdminShell({ user, children }: { user: User; children: React.Rea
       <AdminSidebar role={user.role} collapsed={collapsed} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AdminTopbar user={user} sidebarCollapsed={collapsed} onToggleSidebar={toggle} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

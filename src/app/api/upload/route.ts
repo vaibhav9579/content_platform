@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { requireStaff } from "@/lib/auth";
-import { cloudinary } from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 import { MediaType } from "@prisma/client";
 import { uploadRateLimit } from "@/lib/rate-limit";
+import { saveUploadedFile } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -26,10 +26,8 @@ function mediaTypeFromMime(mime: string): MediaType {
 }
 
 /**
- * Server-side upload proxy: keeps the Cloudinary API secret off the client
- * and lets us enforce auth, size, and mime-type limits before any bytes
- * reach Cloudinary. Used by the editor's image drop/upload UI and the
- * admin Media Library.
+ * Server-side upload proxy: saves uploaded files directly to the Droplet disk
+ * under public/uploads and records metadata in PostgreSQL.
  */
 export async function POST(req: Request) {
   const user = await requireStaff();
@@ -44,7 +42,7 @@ export async function POST(req: Request) {
 
   const formData = await req.formData();
   const file = formData.get("file");
-  const folder = (formData.get("folder") as string) || "content-platform/uploads";
+  const folder = (formData.get("folder") as string) || "uploads";
   const altText = (formData.get("altText") as string) || undefined;
 
   if (!(file instanceof File)) {
@@ -58,36 +56,15 @@ export async function POST(req: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const isRasterImage = file.type !== "image/svg+xml" && file.type !== "image/gif";
 
   try {
-    const result = await new Promise<import("cloudinary").UploadApiResponse>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder,
-          resource_type: "image",
-          overwrite: false,
-          // Cap stored dimensions and let Cloudinary pick the best quality/format
-          // for delivery — a safety net regardless of what the client sent.
-          ...(isRasterImage
-            ? { transformation: [{ width: 2560, height: 2560, crop: "limit" }] }
-            : {}),
-          quality: "auto:good",
-          fetch_format: "auto",
-        },
-        (error, res) => {
-          if (error || !res) return reject(error ?? new Error("Upload failed"));
-          resolve(res);
-        },
-      );
-      stream.end(buffer);
-    });
+    const result = await saveUploadedFile(buffer, file.name, file.type, folder);
 
     const media = await prisma.media.create({
       data: {
-        publicId: result.public_id,
+        publicId: result.publicId,
         url: result.url,
-        secureUrl: result.secure_url,
+        secureUrl: result.secureUrl,
         type: mediaTypeFromMime(file.type),
         format: result.format,
         width: result.width,
@@ -101,20 +78,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ media });
   } catch (err) {
-    console.error("Upload failed", err);
-    const cloudinaryMessage =
-      err && typeof err === "object" && "message" in err && typeof err.message === "string"
-        ? err.message
-        : null;
-    const isAuthError =
-      err && typeof err === "object" && "http_code" in err && (err.http_code === 401 || err.http_code === 403);
+    console.error("Local file upload failed:", err);
     return NextResponse.json(
-      {
-        error: isAuthError
-          ? "Cloudinary rejected this upload — check CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET in your .env."
-          : (cloudinaryMessage ?? "Upload failed. Please try again."),
-      },
-      { status: 502 },
+      { error: "Failed to save file to local storage. Please try again." },
+      { status: 500 },
     );
   }
 }

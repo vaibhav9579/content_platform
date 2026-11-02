@@ -18,7 +18,7 @@ function CodeBlockView({ node }: NodeViewProps) {
   }
 
   return (
-    <NodeViewWrapper className="group relative my-4" data-type="code-block">
+    <NodeViewWrapper className="group relative my-4 max-w-full overflow-hidden" data-type="code-block">
       <div className="border-border bg-card flex items-center justify-between rounded-t-xl border border-b-0 px-3 py-1.5">
         <span className="text-muted-foreground font-mono text-[11px] uppercase tracking-wide">{language}</span>
         <button
@@ -31,8 +31,8 @@ function CodeBlockView({ node }: NodeViewProps) {
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <pre className="!mt-0 !rounded-t-none">
-        <NodeViewContent<"code"> as="code" />
+      <pre className="!mt-0 !rounded-t-none whitespace-pre-wrap break-words overflow-x-hidden max-w-full">
+        <NodeViewContent<"code"> as="code" className="whitespace-pre-wrap break-words" />
       </pre>
     </NodeViewWrapper>
   );

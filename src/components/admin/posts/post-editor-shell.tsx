@@ -73,7 +73,8 @@ import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { TagMultiselect } from "@/components/admin/posts/tag-multiselect";
 import { RevisionHistoryDialog } from "@/components/admin/posts/revision-history-dialog";
 import { InternalLinkSuggestions } from "@/components/admin/posts/internal-link-suggestions";
-import { savePost, autosavePost, findPostWithSameTitle } from "@/features/posts/actions/post-actions";
+import { savePost, autosavePost, findPostWithSameTitle, deletePost } from "@/features/posts/actions/post-actions";
+import { DeletePostDialog } from "@/components/admin/posts/delete-post-dialog";
 import { exportPostAsMarkdown, importMarkdownAsHtml } from "@/features/posts/actions/markdown-actions";
 import { slugifyTitle } from "@/lib/content/slug";
 import { computeReadingStats } from "@/lib/content/reading-time";
@@ -91,6 +92,7 @@ type ExistingPost = {
   subtitle: string | null;
   slug: string;
   contentJson: unknown;
+  contentHtml?: string | null;
   excerpt: string | null;
   metaTitle: string | null;
   metaDescription: string | null;
@@ -189,10 +191,11 @@ export function PostEditorShell({
     checking: boolean;
   } | null>(null);
   const [publishSuccess, setPublishSuccess] = React.useState<{ title: string; slug: string } | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
 
   const contentRef = React.useRef<{ json: JSONContent; html: string }>({
     json: (post?.contentJson as JSONContent) ?? {},
-    html: "",
+    html: post?.contentHtml ?? "",
   });
 
   function handleEditorUpdate(payload: { json: JSONContent; html: string; words: number }) {
@@ -255,8 +258,15 @@ export function PostEditorShell({
     // after certain paste operations (observed: contentJson caught up via
     // onUpdate but contentHtml stayed empty), so always resolve the
     // freshest state right before it's sent to the server.
-    const liveJson = editorRef.current?.getJSON() ?? contentRef.current.json;
-    const liveHtml = editorRef.current?.getHTML() ?? contentRef.current.html;
+    let liveJson = editorRef.current?.getJSON() ?? contentRef.current.json;
+    let liveHtml = editorRef.current?.getHTML() ?? contentRef.current.html;
+
+    // Safety fallback: if editor has not mounted or returned empty paragraph, but original post had HTML and user hasn't made unsaved changes
+    if ((!liveHtml || liveHtml === "<p></p>") && post?.contentHtml && !hasUnsavedChanges) {
+      liveHtml = post.contentHtml;
+      liveJson = (post.contentJson as JSONContent) ?? liveJson;
+    }
+
     return {
       id: postId,
       title,
@@ -389,8 +399,9 @@ export function PostEditorShell({
   // duplicate. Later ticks just update it in place.
   React.useEffect(() => {
     const interval = setInterval(async () => {
-      const html = editorRef.current?.getHTML() ?? contentRef.current.html;
-      const hasRealContent = computeReadingStats(html).words > 0;
+      const liveHtml = editorRef.current?.getHTML() ?? contentRef.current.html;
+      const liveJson = editorRef.current?.getJSON() ?? contentRef.current.json;
+      const hasRealContent = computeReadingStats(liveHtml).words > 0;
       if (!hasRealContent) return;
 
       if (!postId) {
@@ -415,7 +426,12 @@ export function PostEditorShell({
         return;
       }
 
-      const res = await autosavePost(postId, contentRef.current.json, contentRef.current.html);
+      // Safety check: Never autosave an empty body if the existing post already has HTML content
+      if ((!liveHtml || liveHtml.trim() === "" || liveHtml === "<p></p>") && post?.contentHtml) {
+        return;
+      }
+
+      const res = await autosavePost(postId, liveJson, liveHtml);
       if (res.success) {
         setLastSavedAt(new Date());
         setHasUnsavedChanges(false);
@@ -430,7 +446,7 @@ export function PostEditorShell({
       }
     }, 20000);
     return () => clearInterval(interval);
-  }, [postId, router]);
+  }, [postId, router, post?.contentHtml]);
 
   async function handleMarkdownImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -469,8 +485,22 @@ export function PostEditorShell({
     }
   }
 
+  function handleDeletePost() {
+    if (!postId) return;
+    startTransition(async () => {
+      const res = await deletePost(postId);
+      if (res.success) {
+        toast.success("Post moved to trash");
+        setShowDeleteDialog(false);
+        router.push("/admin/posts");
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_300px] lg:grid-cols-[1fr_340px] items-start">
       {/* Main editor column */}
       <div className="min-w-0 space-y-4">
         <div className="flex items-center justify-between gap-2">
@@ -517,8 +547,8 @@ export function PostEditorShell({
           </div>
         </div>
 
-        <Card>
-          <CardContent className="space-y-3 pt-5 pb-5">
+        <Card className="overflow-hidden">
+          <CardContent className="space-y-3 pt-5 pb-5 overflow-hidden">
             <Textarea
               value={title}
               onChange={(e) => {
@@ -528,13 +558,14 @@ export function PostEditorShell({
               }}
               placeholder="Post title…"
               rows={1}
-              className="resize-none border-0 p-0 font-serif text-3xl font-semibold shadow-none focus-visible:ring-0 md:text-4xl"
+              className="resize-none border-0 p-0 font-serif text-3xl font-semibold shadow-none focus-visible:ring-0 md:text-4xl break-words"
             />
-            <Input
+            <Textarea
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               placeholder="Add a subtitle (optional)…"
-              className="text-muted-foreground border-0 p-0 text-lg shadow-none focus-visible:ring-0"
+              rows={1}
+              className="resize-none border-0 p-0 text-lg text-muted-foreground shadow-none focus-visible:ring-0 break-words min-h-0"
             />
             <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
               <span>/blog/</span>
@@ -544,17 +575,21 @@ export function PostEditorShell({
                   setSlugTouched(true);
                   setSlug(e.target.value);
                 }}
-                className="bg-transparent underline decoration-dotted outline-none"
+                className="bg-transparent underline decoration-dotted outline-none min-w-0 flex-1 truncate"
               />
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-5 pb-8">
+        <Card className="overflow-hidden">
+          <CardContent className="pt-5 pb-8 overflow-hidden min-w-0">
             <TiptapEditor
               ref={editorRef}
-              initialContent={(post?.contentJson as JSONContent) ?? null}
+              initialContent={
+                post?.contentJson && Object.keys(post.contentJson as object).length > 0
+                  ? (post.contentJson as JSONContent)
+                  : post?.contentHtml || null
+              }
               onUpdate={handleEditorUpdate}
             />
           </CardContent>
@@ -562,68 +597,35 @@ export function PostEditorShell({
       </div>
 
       {/* Sidebar */}
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle>Publish</CardTitle>
+            <Badge variant={status === PostStatus.PUBLISHED ? "default" : "secondary"}>
+              {status === PostStatus.PUBLISHED ? "Live" : "Draft"}
+            </Badge>
           </CardHeader>
           <CardContent className="space-y-3 pb-5">
-            <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as PostStatus)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={PostStatus.DRAFT}>Draft</SelectItem>
-                  <SelectItem value={PostStatus.IN_REVIEW}>In Review</SelectItem>
-                  <SelectItem value={PostStatus.SCHEDULED} disabled={!allowPublish}>
-                    Scheduled
-                  </SelectItem>
-                  <SelectItem value={PostStatus.PUBLISHED} disabled={!allowPublish}>
-                    Published
-                  </SelectItem>
-                  <SelectItem value={PostStatus.ARCHIVED}>Archived</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {status === PostStatus.SCHEDULED && (
-              <div className="space-y-1.5">
-                <Label>Publish at</Label>
-                <Input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                />
-                <p className="text-muted-foreground text-[11px]">In your local time ({localTimezoneLabel()})</p>
-              </div>
-            )}
-            <div className="flex gap-2 pt-1">
-              <Button className="flex-1" disabled={pending} onClick={() => handleSave()}>
-                {pending && <Loader2Icon className="animate-spin" />} Save
+            <Button
+              className="w-full"
+              disabled={pending}
+              onClick={status === PostStatus.PUBLISHED ? () => handleSave(PostStatus.PUBLISHED) : handlePublishClick}
+            >
+              {pending && <Loader2Icon className="mr-1.5 h-4 w-4 animate-spin" />}
+              {status === PostStatus.PUBLISHED ? "Update" : "Publish"}
+            </Button>
+
+            {status === PostStatus.PUBLISHED && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-destructive w-full text-xs"
+                disabled={pending}
+                onClick={() => handleSave(PostStatus.DRAFT)}
+              >
+                Revert to Draft
               </Button>
-              {allowPublish ? (
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  disabled={pending}
-                  onClick={handlePublishClick}
-                >
-                  Publish
-                </Button>
-              ) : (
-                status !== PostStatus.PUBLISHED && (
-                  <Button
-                    variant="secondary"
-                    className="flex-1"
-                    disabled={pending}
-                    onClick={() => handleSave(PostStatus.IN_REVIEW)}
-                  >
-                    Submit for Review
-                  </Button>
-                )
-              )}
-            </div>
+            )}
             {postId && (
               <Button variant="outline" size="sm" className="w-full" asChild>
                 <a href={`/blog/${slug}`} target="_blank" rel="noreferrer">
@@ -632,6 +634,17 @@ export function PostEditorShell({
               </Button>
             )}
             {postId && <RevisionHistoryDialog revisions={revisions} />}
+            {postId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 w-full text-xs"
+                disabled={pending}
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2Icon className="mr-1.5 size-3.5" /> Move to Trash
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -986,6 +999,15 @@ export function PostEditorShell({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeletePostDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => !open && !pending && setShowDeleteDialog(false)}
+        postTitle={title || post?.title || "Untitled"}
+        isPermanent={false}
+        onConfirm={handleDeletePost}
+        isPending={pending}
+      />
     </div>
   );
 }

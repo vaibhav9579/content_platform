@@ -31,7 +31,7 @@ import { RecentlyViewed } from "@/components/blog/recently-viewed";
 import { ViewTracker } from "@/components/blog/view-tracker";
 import { Badge } from "@/components/ui/badge";
 
-export const revalidate = 3600;
+export const revalidate = 60;
 
 export async function generateMetadata({
   params,
@@ -136,8 +136,8 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
             </div>
           </aside>
 
-          <div className="min-w-0">
-            <header className="mx-auto max-w-3xl">
+          <div className="min-w-0 max-w-full overflow-hidden">
+            <header className="mx-auto max-w-3xl min-w-0">
               {post.category && (
                 <Link
                   href={`/category/${post.category.slug}`}
@@ -146,11 +146,11 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
                   {post.category.name}
                 </Link>
               )}
-              <h1 className="mt-2 text-balance font-serif text-4xl font-semibold tracking-tight md:text-5xl">
+              <h1 className="mt-2 text-balance font-serif text-4xl font-semibold tracking-tight md:text-5xl break-words">
                 {post.title}
               </h1>
               {post.subtitle && (
-                <p className="text-muted-foreground mt-3 text-xl leading-relaxed text-balance">{post.subtitle}</p>
+                <p className="text-muted-foreground mt-3 text-xl leading-relaxed text-balance break-words">{post.subtitle}</p>
               )}
 
               <div className="mt-6 flex items-center justify-between gap-4">
@@ -180,7 +180,7 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
               </div>
             )}
 
-            <div className="mx-auto mt-10 max-w-3xl">
+            <div className="mx-auto mt-10 max-w-3xl min-w-0 max-w-full">
               {post.summary && <SummaryBlock summary={post.summary} />}
 
               <ArticleContent id={contentId} html={post.contentHtml ?? ""} />

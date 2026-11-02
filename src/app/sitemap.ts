@@ -31,7 +31,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: post.updatedAtCms,
     changeFrequency: "weekly",
     priority: 0.8,
-    ...(post.coverImageUrl ? { images: [post.coverImageUrl] } : {}),
+    ...(post.coverImageUrl
+      ? {
+          images: [
+            post.coverImageUrl.startsWith("http")
+              ? post.coverImageUrl
+              : `${siteConfig.url.replace(/\/+$/, "")}${post.coverImageUrl.startsWith("/") ? "" : "/"}${post.coverImageUrl}`,
+          ],
+        }
+      : {}),
   }));
 
   const categoryRoutes: MetadataRoute.Sitemap = categories.map((c) => ({

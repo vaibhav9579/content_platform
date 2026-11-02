@@ -36,47 +36,53 @@ export function SettingsForm({ settings }: { settings: SiteSettingsInput }) {
           <CardTitle>Site Identity</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 pb-5">
-          <Field label="Site Name">
-            <Input value={form.siteName} onChange={(e) => set("siteName", e.target.value)} required />
-          </Field>
-          <Field label="Description">
-            <Textarea
-              rows={2}
-              value={form.siteDescription}
-              onChange={(e) => set("siteDescription", e.target.value)}
-              required
-            />
-          </Field>
-          <Field label="Site URL">
-            <Input value={form.siteUrl} onChange={(e) => set("siteUrl", e.target.value)} required />
-          </Field>
-          <Field label="Contact Email">
-            <Input value={form.contactEmail ?? ""} onChange={(e) => set("contactEmail", e.target.value)} />
-          </Field>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Site Name">
+              <Input value={form.siteName} onChange={(e) => set("siteName", e.target.value)} required />
+            </Field>
+            <Field label="Site URL">
+              <Input value={form.siteUrl} onChange={(e) => set("siteUrl", e.target.value)} required />
+            </Field>
+            <Field label="Contact Email">
+              <Input value={form.contactEmail ?? ""} onChange={(e) => set("contactEmail", e.target.value)} />
+            </Field>
+            <div className="md:col-span-2">
+              <Field label="Description">
+                <Textarea
+                  rows={2}
+                  value={form.siteDescription}
+                  onChange={(e) => set("siteDescription", e.target.value)}
+                  required
+                />
+              </Field>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Branding</CardTitle>
+          <CardTitle>Branding & Social</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 pb-5">
-          <Field label="Logo URL">
-            <Input value={form.logoUrl ?? ""} onChange={(e) => set("logoUrl", e.target.value)} />
-          </Field>
-          <Field label="Favicon URL">
-            <Input value={form.faviconUrl ?? ""} onChange={(e) => set("faviconUrl", e.target.value)} />
-          </Field>
-          <Field label="Default OG Image">
-            <Input value={form.defaultOgImageUrl ?? ""} onChange={(e) => set("defaultOgImageUrl", e.target.value)} />
-          </Field>
-          <Field label="Twitter Handle">
-            <Input
-              placeholder="@yourhandle"
-              value={form.twitterHandle ?? ""}
-              onChange={(e) => set("twitterHandle", e.target.value)}
-            />
-          </Field>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Logo URL">
+              <Input value={form.logoUrl ?? ""} onChange={(e) => set("logoUrl", e.target.value)} />
+            </Field>
+            <Field label="Favicon URL">
+              <Input value={form.faviconUrl ?? ""} onChange={(e) => set("faviconUrl", e.target.value)} />
+            </Field>
+            <Field label="Default OG Image">
+              <Input value={form.defaultOgImageUrl ?? ""} onChange={(e) => set("defaultOgImageUrl", e.target.value)} />
+            </Field>
+            <Field label="Twitter Handle">
+              <Input
+                placeholder="@yourhandle"
+                value={form.twitterHandle ?? ""}
+                onChange={(e) => set("twitterHandle", e.target.value)}
+              />
+            </Field>
+          </div>
         </CardContent>
       </Card>
 
@@ -85,33 +91,37 @@ export function SettingsForm({ settings }: { settings: SiteSettingsInput }) {
           <CardTitle>Organization & Verification</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 pb-5">
-          <Field label="Organization Name">
-            <Input value={form.organizationName ?? ""} onChange={(e) => set("organizationName", e.target.value)} />
-          </Field>
-          <Field label="Organization Logo URL">
-            <Input
-              value={form.organizationLogoUrl ?? ""}
-              onChange={(e) => set("organizationLogoUrl", e.target.value)}
-            />
-          </Field>
-          <Field label="Google Search Console Verification">
-            <Input
-              value={form.googleSiteVerification ?? ""}
-              onChange={(e) => set("googleSiteVerification", e.target.value)}
-            />
-          </Field>
-          <Field label="Bing Webmaster Verification">
-            <Input
-              value={form.bingSiteVerification ?? ""}
-              onChange={(e) => set("bingSiteVerification", e.target.value)}
-            />
-          </Field>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Organization Name">
+              <Input value={form.organizationName ?? ""} onChange={(e) => set("organizationName", e.target.value)} />
+            </Field>
+            <Field label="Organization Logo URL">
+              <Input
+                value={form.organizationLogoUrl ?? ""}
+                onChange={(e) => set("organizationLogoUrl", e.target.value)}
+              />
+            </Field>
+            <Field label="Google Search Console Verification">
+              <Input
+                value={form.googleSiteVerification ?? ""}
+                onChange={(e) => set("googleSiteVerification", e.target.value)}
+              />
+            </Field>
+            <Field label="Bing Webmaster Verification">
+              <Input
+                value={form.bingSiteVerification ?? ""}
+                onChange={(e) => set("bingSiteVerification", e.target.value)}
+              />
+            </Field>
+          </div>
         </CardContent>
       </Card>
 
-      <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : "Save Settings"}
-      </Button>
+      <div className="flex justify-end">
+        <Button type="submit" disabled={pending} className="min-w-32">
+          {pending ? "Saving…" : "Save Settings"}
+        </Button>
+      </div>
     </form>
   );
 }

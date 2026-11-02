@@ -3,8 +3,8 @@ import { ChevronRightIcon } from "lucide-react";
 
 export function Breadcrumbs({ items }: { items: { name: string; href: string }[] }) {
   return (
-    <nav aria-label="Breadcrumb" className="text-muted-foreground overflow-x-auto text-sm whitespace-nowrap">
-      <ol className="flex items-center gap-1.5">
+    <nav aria-label="Breadcrumb" className="text-muted-foreground text-sm">
+      <ol className="flex flex-wrap items-center gap-1.5">
         {items.map((item, i) => (
           <li key={item.href} className="flex items-center gap-1.5">
             {i > 0 && <ChevronRightIcon className="size-3.5 shrink-0" />}

@@ -18,6 +18,7 @@ import {
   getAllComments,
 } from "@/features/comments/actions";
 import { formatDate, truncate } from "@/lib/utils";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 type Comment = {
   id: string;
@@ -52,6 +53,7 @@ export function CommentModerationTable({
   const [page, setPage] = React.useState(1);
   const [totalCount, setTotalCount] = React.useState(initialTotalCount);
   const [totalPages, setTotalPages] = React.useState(initialTotalPages);
+  const [deleteTargetId, setDeleteTargetId] = React.useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function act(id: string, fn: () => Promise<{ success: boolean; error?: string }>, refetch = false) {
@@ -167,11 +169,7 @@ export function CommentModerationTable({
                     variant="ghost"
                     size="icon"
                     disabled={pending}
-                    onClick={() => {
-                      if (confirm("Permanently delete this comment? This cannot be undone.")) {
-                        act(c.id, () => permanentlyDeleteComment(c.id), true);
-                      }
-                    }}
+                    onClick={() => setDeleteTargetId(c.id)}
                     aria-label="Delete permanently"
                   >
                     <Trash2Icon className="text-destructive size-4" />
@@ -193,6 +191,23 @@ export function CommentModerationTable({
         totalCount={totalCount}
         pageSize={pageSize}
         onPageChange={(p) => loadPage(tab, p)}
+      />
+
+      <ConfirmActionDialog
+        open={!!deleteTargetId}
+        onOpenChange={(open) => !open && !pending && setDeleteTargetId(null)}
+        title="Permanently Delete Comment?"
+        description="Are you sure you want to permanently delete this comment? This action cannot be undone."
+        confirmLabel="Delete Permanently"
+        variant="destructive"
+        icon={Trash2Icon}
+        onConfirm={() => {
+          if (!deleteTargetId) return;
+          const id = deleteTargetId;
+          act(id, () => permanentlyDeleteComment(id), true);
+          setDeleteTargetId(null);
+        }}
+        isPending={pending}
       />
     </div>
   );

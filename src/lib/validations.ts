@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { DifficultyLevel, PostStatus, Role } from "@prisma/client";
 
+export const imageUrlSchema = z
+  .string()
+  .refine(
+    (val) => !val || val.startsWith("/") || /^https?:\/\//i.test(val),
+    { message: "Must be a valid URL or local path (e.g. /uploads/...)" }
+  );
+
 export const faqItemSchema = z.object({
   question: z.string().min(1, "FAQ question can't be empty").max(300, "FAQ question is too long (max 300 characters)"),
   answer: z.string().min(1, "FAQ answer can't be empty").max(2000, "FAQ answer is too long (max 2000 characters)"),
@@ -37,10 +44,10 @@ export const postInputSchema = z.object({
     .nullable()
     .or(z.literal("")),
   metaRobots: z.string().default("index, follow"),
-  coverImageUrl: z.string().url().optional().nullable().or(z.literal("")),
+  coverImageUrl: imageUrlSchema.optional().nullable().or(z.literal("")),
   coverImageAlt: z.string().max(200, "Alt text is too long (max 200 characters)").optional().nullable(),
-  ogImageUrl: z.string().url().optional().nullable().or(z.literal("")),
-  galleryUrls: z.array(z.string().url()).default([]),
+  ogImageUrl: imageUrlSchema.optional().nullable().or(z.literal("")),
+  galleryUrls: z.array(imageUrlSchema).default([]),
   status: z.nativeEnum(PostStatus).default(PostStatus.DRAFT),
   publishedAt: z.coerce.date().optional().nullable(),
   scheduledAt: z.coerce.date().optional().nullable(),
@@ -87,8 +94,8 @@ export const authorInputSchema = z.object({
   name: z.string().min(1).max(120),
   slug: z.string().min(1).max(120).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   bio: z.string().max(2000).optional().nullable(),
-  avatarUrl: z.string().url().optional().nullable().or(z.literal("")),
-  coverUrl: z.string().url().optional().nullable().or(z.literal("")),
+  avatarUrl: imageUrlSchema.optional().nullable().or(z.literal("")),
+  coverUrl: imageUrlSchema.optional().nullable().or(z.literal("")),
   title: z.string().max(120).optional().nullable(),
   experience: z.string().max(2000).optional().nullable(),
   location: z.string().max(120).optional().nullable(),
@@ -135,12 +142,12 @@ export const siteSettingsSchema = z.object({
   siteName: z.string().min(1).max(100),
   siteDescription: z.string().min(1).max(300),
   siteUrl: z.string().url(),
-  logoUrl: z.string().url().optional().nullable().or(z.literal("")),
-  faviconUrl: z.string().url().optional().nullable().or(z.literal("")),
-  defaultOgImageUrl: z.string().url().optional().nullable().or(z.literal("")),
+  logoUrl: imageUrlSchema.optional().nullable().or(z.literal("")),
+  faviconUrl: imageUrlSchema.optional().nullable().or(z.literal("")),
+  defaultOgImageUrl: imageUrlSchema.optional().nullable().or(z.literal("")),
   twitterHandle: z.string().max(60).optional().nullable(),
   organizationName: z.string().max(120).optional().nullable(),
-  organizationLogoUrl: z.string().url().optional().nullable().or(z.literal("")),
+  organizationLogoUrl: imageUrlSchema.optional().nullable().or(z.literal("")),
   contactEmail: z.string().email().optional().nullable().or(z.literal("")),
   googleSiteVerification: z.string().max(200).optional().nullable(),
   bingSiteVerification: z.string().max(200).optional().nullable(),
@@ -152,7 +159,7 @@ export const bannerInputSchema = z
     id: z.string().cuid().optional(),
     title: z.string().max(120, "Title is too long (max 120 characters)").optional().nullable(),
     subtitle: z.string().max(200, "Subtitle is too long (max 200 characters)").optional().nullable(),
-    imageUrl: z.string().url("Upload a banner image"),
+    imageUrl: imageUrlSchema,
     imageAlt: z.string().max(200).optional().nullable(),
     linkUrl: z.string().max(500, "Link is too long").optional().nullable(),
     ctaLabel: z.string().max(40, "Button label is too long (max 40 characters)").optional().nullable(),

@@ -18,7 +18,7 @@ type MediaItem = Awaited<ReturnType<typeof getMedia>>["media"][number];
  * Shared "add an image" dialog: upload a fresh file, or pick one already in
  * the Media Library. Used by both the editor's slash-command image insert
  * and any cover-image-style field, so every image entry point in the CMS
- * offers reuse instead of only ever uploading a fresh Cloudinary asset.
+ * offers reuse instead of only ever uploading a fresh asset.
  */
 export function MediaPickerDialog({
   open,

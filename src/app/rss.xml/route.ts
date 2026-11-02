@@ -32,8 +32,14 @@ export async function GET() {
       guid: post.id,
       categories: post.category ? [post.category.name] : [],
       author: post.author.name,
+      enclosure: post.coverImageUrl
+        ? {
+            url: post.coverImageUrl.startsWith("http")
+              ? post.coverImageUrl
+              : `${siteConfig.url.replace(/\/+$/, "")}${post.coverImageUrl.startsWith("/") ? "" : "/"}${post.coverImageUrl}`,
+          }
+        : undefined,
       date: post.publishedAt ?? post.createdAt,
-      enclosure: post.coverImageUrl ? { url: post.coverImageUrl } : undefined,
     });
   }
 

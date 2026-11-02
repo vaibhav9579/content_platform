@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { saveBanner, deleteBanner, getBanners } from "@/features/banners/actions";
 import type { BannerInput } from "@/lib/validations";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 type Banner = Awaited<ReturnType<typeof getBanners>>[number];
 
@@ -52,6 +53,7 @@ export function BannerManager({ initialBanners }: { initialBanners: Banner[] }) 
   const [banners, setBanners] = React.useState(initialBanners);
   const [pending, startTransition] = useTransition();
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; title: string } | null>(null);
   const [form, setForm] = React.useState<BannerInput>(EMPTY_FORM);
 
   function refresh() {
@@ -101,11 +103,17 @@ export function BannerManager({ initialBanners }: { initialBanners: Banner[] }) 
   }
 
   function handleDelete(id: string, title: string) {
-    if (!confirm(`Delete "${title || "this banner"}"? This can't be undone.`)) return;
+    setDeleteTarget({ id, title });
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
     startTransition(async () => {
       const result = await deleteBanner(id);
       if (result.success) {
         toast.success("Banner deleted");
+        setDeleteTarget(null);
         refresh();
       } else {
         toast.error(result.error);
@@ -313,6 +321,24 @@ export function BannerManager({ initialBanners }: { initialBanners: Banner[] }) 
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmActionDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && !pending && setDeleteTarget(null)}
+        title="Delete Banner?"
+        description={
+          <>
+            Are you sure you want to delete &quot;
+            <span className="font-medium text-foreground">{deleteTarget?.title || "this banner"}</span>
+            &quot;? This action cannot be undone.
+          </>
+        }
+        confirmLabel="Delete Banner"
+        variant="destructive"
+        icon={Trash2Icon}
+        onConfirm={confirmDelete}
+        isPending={pending}
+      />
     </div>
   );
 }

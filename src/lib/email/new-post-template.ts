@@ -10,8 +10,13 @@ export function newPostEmailHtml(opts: {
 }) {
   const postUrl = absoluteUrl(`/blog/${opts.slug}`);
   const unsubscribeUrl = absoluteUrl(`/unsubscribe?token=${opts.unsubscribeToken}`);
-  const cover = opts.coverImageUrl
-    ? `<img src="${opts.coverImageUrl}" alt="" width="600" style="width:100%;max-width:600px;height:auto;border-radius:12px;display:block;margin-bottom:24px;" />`
+  const coverSrc = opts.coverImageUrl
+    ? opts.coverImageUrl.startsWith("http")
+      ? opts.coverImageUrl
+      : absoluteUrl(opts.coverImageUrl)
+    : null;
+  const cover = coverSrc
+    ? `<img src="${coverSrc}" alt="" width="600" style="width:100%;max-width:600px;height:auto;border-radius:12px;display:block;margin-bottom:24px;" />`
     : "";
 
   return `
